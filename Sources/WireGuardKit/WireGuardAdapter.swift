@@ -234,8 +234,9 @@ public class WireGuardAdapter {
                     settingsGenerator
                 )
 
-                let gatewayAddress = IPv4Address("10.64.0.1")!
-                try self.openICMP(address: gatewayAddress)
+                if let gateway = exitConfiguration.pingableGateway {
+                    try self.openICMP(address: gateway)
+                }
 
                 completionHandler(nil)
             } catch let error as WireGuardAdapterError {
@@ -338,8 +339,9 @@ public class WireGuardAdapter {
                 self.state = .started(handle, settingsGenerator)
 
                 do {
-                    let gatewayAddress = IPv4Address("10.64.0.1")!
-                    try self.openICMP(address: gatewayAddress)
+                    if let gateway = tunnelConfiguration.pingableGateway {
+                        try self.openICMP(address: gateway)
+                    }
                 } catch let error as WireGuardAdapterError {
                     completionHandler(error)
                     return
@@ -599,8 +601,9 @@ public class WireGuardAdapter {
                     settingsGenerator
                 )
 
-                let gatewayAddress = IPv4Address("10.64.0.1")!
-                try self.openICMP(address: gatewayAddress)
+                if let gatewayAddress = settingsGenerator.exit.configuration.pingableGateway {
+                    try self.openICMP(address: gatewayAddress)
+                }
             } catch {
                 self.logHandler(.error, "Failed to restart backend: \(error.localizedDescription)")
             }
@@ -662,9 +665,9 @@ extension WireGuardAdapter: ICMPPingProvider {
             guard case .started(let tunnelHandle, _) = self.state, let icmpSocketHandle else {
                 throw WireGuardAdapterError.icmpSocketNotOpen
             }
-            return (tunnelHandle, icmpSocketHandle)
+            return (tunnelHandle: tunnelHandle, socketHandle: icmpSocketHandle)
         }
-        let result = wgRecvInTunnelPing(tunnelSocketPair.0, tunnelSocketPair.1)
+        let result = wgRecvInTunnelPing(tunnelSocketPair.tunnelHandle, tunnelSocketPair.socketHandle)
         if result < 0 {
             try Self.throwError(result: result)
         }
@@ -678,9 +681,9 @@ extension WireGuardAdapter: ICMPPingProvider {
             guard case .started(let tunnelHandle, _) = self.state, let icmpSocketHandle else {
                 throw WireGuardAdapterError.icmpSocketNotOpen
             }
-            return (tunnelHandle, icmpSocketHandle)
+            return (tunnelHandle: tunnelHandle, socketHandle: icmpSocketHandle)
         }
-        let seq = wgSendInTunnelPing(tunnelSocketPair.0, tunnelSocketPair.1, pingId, 16, seqNumber)
+        let seq = wgSendInTunnelPing(tunnelSocketPair.tunnelHandle, tunnelSocketPair.socketHandle, pingId, 16, seqNumber)
         if seq < 0 { try Self.throwError(result: seq) }
     }
 
