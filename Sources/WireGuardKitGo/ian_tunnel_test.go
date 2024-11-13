@@ -20,7 +20,7 @@ func TestPing(t *testing.T) {
 	aConfig := configs[0] + endpointConfigs[0]
 	bConfig := configs[1] + endpointConfigs[1]
 
-	tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil, 0, 0)
+	tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil)
 
 	bDev := device.NewDevice(b, conn.NewStdNetBind(), device.NewLogger(device.LogLevelSilent, ""))
 

@@ -603,14 +603,13 @@ func TestRapidShutdown(t *testing.T) {
 	configs, endpointConfigs := genConfigs(t)
 	aConfig := configs[0] + endpointConfigs[0]
 
-
 	remoteAddr := "1.2.3.5:9090"
 
 	// Opening connections that go nowhere must not block the shutdown of a tunnel
 	for i := 0; i < 3000; i += 1 {
 		aIp := netip.AddrFrom4([4]byte{1, 2, 3, 4})
 		a, _, _ := netstack.CreateNetTUN([]netip.Addr{aIp}, []netip.Addr{}, 1280)
-		tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil, 0, 0)
+		tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil)
 		_ = wgOpenInTunnelTCP(tunnel, cstring(remoteAddr), 1)
 		wgTurnOff(tunnel)
 	}
