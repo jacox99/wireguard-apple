@@ -3,9 +3,12 @@ package main
 import (
 	"net/netip"
 	"time"
+	"unsafe"
 
 	"testing"
 
+	"golang.zx2c4.com/wireguard/conn"
+	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
 )
 
@@ -43,5 +46,45 @@ func TestIcmpSocketCloseFailsReadImmediately(t *testing.T) {
 
 	if recvResult >= 0 {
 		t.Fatalf("Expected the ICMP socket read to fail with an error, thus expected a negative erorr code, instead got %d", err)
+	}
+}
+
+func TestIcmpSocketParse(t *testing.T) {
+	aIp := netip.AddrFrom4([4]byte{1, 2, 3, 4})
+	bIp := netip.AddrFrom4([4]byte{1, 2, 3, 5})
+
+	a, _, _ := netstack.CreateNetTUN([]netip.Addr{aIp}, []netip.Addr{}, 1280)
+	b, _, _ := netstack.CreateNetTUN([]netip.Addr{bIp}, []netip.Addr{}, 1280)
+
+	configs, endpointConfigs := genConfigs(t)
+	aConfig := configs[0] + endpointConfigs[0]
+	bConfig := configs[1] + endpointConfigs[1]
+
+	tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil, 0, 0)
+
+	bDev := device.NewDevice(b, conn.NewStdNetBind(), device.NewLogger(device.LogLevelSilent, ""))
+
+	bDev.IpcSet(bConfig)
+	bDev.Up()
+
+	pingableHost := []byte(bIp.String())
+	pingableHost = append(pingableHost, 0)
+	icmpSocket := wgOpenInTunnelICMP(tunnel, (*_Ctype_char)(unsafe.Pointer(unsafe.SliceData(pingableHost))))
+
+	go func() {
+		id := int32(133)
+		seq := uint16(1)
+		for {
+			result := wgSendInTunnelPing(tunnel, icmpSocket, uint16(id), id, seq)
+			seq += 1
+			if result < 0 {
+				return
+			}
+		}
+	}()
+
+	result := wgRecvInTunnelPing(tunnel, icmpSocket)
+	if result < 0 {
+		t.Fatalf("Expected non zero result - %v", result)
 	}
 }

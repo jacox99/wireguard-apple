@@ -187,6 +187,7 @@ public class WireGuardAdapter {
         // Shutdown the tunnel
         if case .started(let handle, _) = self.state {
             wgTurnOff(handle)
+            self.icmpSocketHandle = nil
         }
     }
 
@@ -269,6 +270,7 @@ public class WireGuardAdapter {
             switch self.state {
             case .started(let handle, _):
                 wgTurnOff(handle)
+                self.icmpSocketHandle = nil
 
             case .temporaryShutdown:
                 break
@@ -654,10 +656,10 @@ extension WireGuardAdapter: ICMPPingProvider {
         self.icmpSocketHandle = socket
     }
 
-    private func closeICMP() {
+    public func closeICMP() {
         dispatchPrecondition(condition: .onQueue(workQueue))
-        if let icmpSocketHandle {
-            wgCloseInTunnelICMP(icmpSocketHandle)
+        if let icmpSocketHandle, case let .started(tunnelHandle, _) = state {
+            wgCloseInTunnelICMP(tunnelHandle, icmpSocketHandle)
             self.icmpSocketHandle = nil
         }
     }
