@@ -106,8 +106,8 @@ func (pi PacketHeaderData) asPacketIdentifier() PacketIdentifier {
 	destAddrBytes := pi.remoteAddr.As16()
 	result[0] = uint8(pi.protocol)
 	result[1] = 0
-	copy(result[4:], destAddrBytes[:])
 	binary.BigEndian.PutUint16(result[2:], pi.localPort)
+	copy(result[4:], destAddrBytes[:])
 	binary.BigEndian.PutUint16(result[20:], pi.remotePort)
 	return result
 }
@@ -195,12 +195,6 @@ func (r *Router) Read(bufs []byte, offset int) (n int, err error) {
 	case _, _ = <-r.read.rxShutdown:
 		return 0, io.EOF
 	case batch, ok = <-r.read.rxChannel:
-		defer func() {
-			// Avoid reading nil values if a read happens after rxChannel is closed
-			if batch != nil {
-				batch.completion <- batch
-			}
-		}()
 		if !ok {
 			return 0, errors.New("reader shut down")
 		}
@@ -211,8 +205,16 @@ func (r *Router) Read(bufs []byte, offset int) (n int, err error) {
 
 	copy(bufs[offset:], packet)
 
+
 	if batch.isVirtual && fillPacketHeaderData(bufs[offset:], &headerData, false) {
 		r.read.setVirtualRoute(headerData)
+	}
+
+	// important to unblock the underlying reader.
+	select {
+	case _, _ = <-r.read.rxShutdown:
+		return 0, io.EOF
+	case batch.completion <- batch:
 	}
 
 	return len(packet), nil
@@ -280,17 +282,24 @@ func (r *routerRead) readWorker(device tun.Device, isVirtual bool) {
 			}
 			return
 		}
+
 		batch.packet = batch.packet[defaultOffset : n+defaultOffset]
 		batch.isVirtual = isVirtual
+		// Submitting read from virtual device to router
 		select {
 		case _, _ = <-r.rxShutdown:
 			return
 		case r.rxChannel <- batch:
 		}
+
+		// Waiting for router to finish the submitted read
 		select {
 		case _, _ = <-r.rxShutdown:
 			return
-		case batch = <-completion:
+		case batch, ok := <-completion:
+			if !ok {
+				return
+			}
 			batch.packet = buffer
 		}
 	}

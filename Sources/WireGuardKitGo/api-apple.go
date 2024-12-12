@@ -18,7 +18,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
-	"net"
 	"net/netip"
 	"os"
 	"os/signal"
@@ -37,34 +36,36 @@ import (
 )
 
 const (
-	_              = iota
-	errBadIPString = -iota
-	errDup
-	errSetNonblock
-	errCreateTun
-	errCreateVirtualTun
-	errNoVirtualNet
-	errBadWgConfig
-	errDeviceLimitHit
-	errGetMtu
-	errNoEndpointInConfig
+	errBadIPString        = -1
+	errDup                = -2
+	errSetNonblock        = -3
+	errCreateTun          = -4
+	errCreateVirtualTun   = -5
+	errNoVirtualNet       = -6
+	errBadWgConfig        = -7
+	errDeviceLimitHit     = -8
+	errGetMtu             = -9
+	errNoEndpointInConfig = -10
 	// Configuration for a given device contains no peers. It is peerless.
-	errBadEntryConfig
+	errBadEntryConfig = -11
 	// After applying a configuration to a given WireGuard device, it fails to return a peer it was configured to have.
-	errNoPeer
+	errNoPeer = -12
 	// Failed to enable DAITA
-	errEnableDaita
+	errEnableDaita = -13
 	// ICMP errors
-	errICMPOpenSocket
-	errICMPWriteSocket
-	errICMPReadSocket
-	errICMPResponseFormat
-	errICMPResponseContent
+	errICMPOpenSocket      = -14
+	errICMPWriteSocket     = -15
+	errICMPReadSocket      = -16
+	errICMPResponseFormat  = -17
+	errICMPResponseContent = -18
 	// no such tunnel exists
-	errNoSuchTunnel
+	errNoSuchTunnel = -19
 	// tunnel does not have virtual interface
-	errNoTunnelVirtualInterface
-	errICMPTimeout
+	errNoTunnelVirtualInterface = -20
+	// TCP errors
+	errTCPNoSocket = -21
+	errTCPWrite    = -22
+	errTCPRead     = -23
 )
 
 var loggerFunc unsafe.Pointer
@@ -88,20 +89,7 @@ func (l CLogger) Printf(format string, args ...interface{}) {
 	C.callLogger(loggerFunc, loggerCtx, C.int(l), cstring(fmt.Sprintf(format, args...)))
 }
 
-type tunnelHandle struct {
-	exit       *device.Device
-	entry      *device.Device
-	logger     *device.Logger
-	virtualNet *netstack.Net
-}
-
-type icmpHandle struct {
-	tunnelHandle int32
-	icmpSocket   net.Conn
-}
-
-var tunnelHandles = make(map[int32]tunnelHandle)
-var icmpHandles = make(map[int32]icmpHandle)
+var tunnels = NewTunnelHandles()
 
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -275,90 +263,52 @@ func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachi
 
 //export wgTurnOff
 func wgTurnOff(tunnelHandle int32) {
-	handle, ok := tunnelHandles[tunnelHandle]
-	if !ok {
+	handle := tunnels.Remove(tunnelHandle)
+	if handle == nil {
 		return
 	}
-	for icmpHandle, icmpData := range icmpHandles {
-		if icmpData.tunnelHandle == tunnelHandle {
-			wgCloseInTunnelICMP(icmpHandle)
-		}
-	}
-	delete(tunnelHandles, tunnelHandle)
-
-	handle.exit.Close()
-
-	if handle.entry != nil {
-		handle.entry.Close()
-	}
+	handle.Close()
 }
 
 //export wgSetConfig
 func wgSetConfig(tunnelHandle int32, settings *C.char) int64 {
-	handle, ok := tunnelHandles[tunnelHandle]
-	if !ok {
-		return 0
+	handle := tunnels.Get(tunnelHandle)
+	if handle == nil {
+		return errNoSuchTunnel
 	}
-	err := handle.exit.IpcSet(C.GoString(settings))
-	if err != nil {
-		handle.logger.Errorf("Unable to set IPC settings: %v", err)
-		if ipcErr, ok := err.(*device.IPCError); ok {
-			return ipcErr.ErrorCode()
-		}
-		return errBadWgConfig
-	}
-	return 0
+	return handle.SetConfig(C.GoString(settings))
 }
 
 //export wgGetConfig
 func wgGetConfig(tunnelHandle int32) *C.char {
-	handle, ok := tunnelHandles[tunnelHandle]
-	if !ok {
+	handle := tunnels.Get(tunnelHandle)
+	if handle == nil {
 		return nil
 	}
 
-	settings, err := handle.exit.IpcGet()
-	if err != nil {
+	settings := handle.GetConfig()
+	if settings == nil {
 		return nil
 	}
-	return C.CString(settings)
+	return C.CString(*settings)
 }
 
 //export wgBumpSockets
 func wgBumpSockets(tunnelHandle int32) {
-	handle, ok := tunnelHandles[tunnelHandle]
-	if !ok {
+	handle := tunnels.Get(tunnelHandle)
+	if handle == nil {
 		return
 	}
-	device := handle.exit
-	if handle.entry != nil {
-		device = handle.entry
-	}
-
-	go func() {
-		for i := 0; i < 10; i++ {
-			err := device.BindUpdate()
-			if err == nil {
-				device.SendKeepalivesToPeersWithCurrentKeypair()
-				return
-			}
-			handle.logger.Errorf("Unable to update bind, try %d: %v", i+1, err)
-			time.Sleep(time.Second / 2)
-		}
-		handle.logger.Errorf("Gave up trying to update bind; tunnel is likely dysfunctional")
-	}()
+	handle.BumpSockets()
 }
 
 //export wgDisableSomeRoamingForBrokenMobileSemantics
 func wgDisableSomeRoamingForBrokenMobileSemantics(tunnelHandle int32) {
-	dev, ok := tunnelHandles[tunnelHandle]
-	if !ok {
+	handle := tunnels.Get(tunnelHandle)
+	if handle == nil {
 		return
 	}
-	dev.exit.DisableSomeRoamingForBrokenMobileSemantics()
-	if dev.entry != nil {
-		dev.entry.DisableSomeRoamingForBrokenMobileSemantics()
-	}
+	handle.DisableSomeRoamingForBrokenMobileSemantics()
 }
 
 //export wgVersion

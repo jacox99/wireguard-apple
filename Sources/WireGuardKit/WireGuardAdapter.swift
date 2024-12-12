@@ -88,6 +88,11 @@ public class WireGuardAdapter {
     /// ID to use for ICMP echo requests. Should be reset for every tunnel connection.
     private var pingId: UInt16 = UInt16.random(in: UInt16.min...UInt16.max)
 
+    public let inTunnelTcpOpen: @convention(c) (Int32, UnsafePointer<Int8>?, UInt64) -> Int32  = wgOpenInTunnelTCP
+    public let inTunnelTcpClose: @convention(c) (Int32, Int32) -> Int32 = wgCloseInTunnelTCP
+    public let inTunnelTcpRecv: @convention(c) (Int32, Int32, UnsafeMutablePointer<UInt8>?, Int32) -> Int32 = wgRecvInTunnelTCP
+    public let inTunnelTcpSend: @convention(c) (Int32, Int32, UnsafePointer<UInt8>?, Int32) -> Int32 = wgSendInTunnelTCP
+
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
         var ctlInfo = ctl_info()
@@ -182,6 +187,7 @@ public class WireGuardAdapter {
         // Shutdown the tunnel
         if case .started(let handle, _) = self.state {
             wgTurnOff(handle)
+            self.icmpSocketHandle = nil
         }
     }
 
@@ -264,6 +270,7 @@ public class WireGuardAdapter {
             switch self.state {
             case .started(let handle, _):
                 wgTurnOff(handle)
+                self.icmpSocketHandle = nil
 
             case .temporaryShutdown:
                 break
@@ -649,10 +656,10 @@ extension WireGuardAdapter: ICMPPingProvider {
         self.icmpSocketHandle = socket
     }
 
-    private func closeICMP() {
+    public func closeICMP() {
         dispatchPrecondition(condition: .onQueue(workQueue))
-        if let icmpSocketHandle {
-            wgCloseInTunnelICMP(icmpSocketHandle)
+        if let icmpSocketHandle, case let .started(tunnelHandle, _) = state {
+            wgCloseInTunnelICMP(tunnelHandle, icmpSocketHandle)
             self.icmpSocketHandle = nil
         }
     }
@@ -695,6 +702,18 @@ extension WireGuardAdapter: ICMPPingProvider {
             default: throw WireGuardAdapterError.internalError(result)
         }
 
+    }
+
+    /// Returns the handle associated with the tunnel. If the tunnel is not started, this will not return anything.
+    public func tunnelHandle() throws  -> Int32 {
+        dispatchPrecondition(condition: .notOnQueue(workQueue))
+        return try workQueue.sync {
+            guard case .started(let tunnelHandle, _) = self.state else {
+                throw WireGuardAdapterError.invalidState
+            }
+
+            return tunnelHandle
+        }
     }
 }
 
