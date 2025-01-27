@@ -318,9 +318,10 @@ func newRouterRead(real, virtual tun.Device, virtualRouteChan chan PacketIdentif
 		errorChannel,
 		nil,
 	}
+
+	result.waitGroup.Add(2)
 	go result.readWorker(real, false)
 	go result.readWorker(virtual, true)
-	result.waitGroup.Add(2)
 	return result
 }
 
