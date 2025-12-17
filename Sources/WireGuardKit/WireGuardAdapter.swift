@@ -229,7 +229,6 @@ public class WireGuardAdapter {
 
             do {
                 let settingsGenerator = try self.makeSettingsGenerator(with: exitConfiguration, entryConfiguration: entryConfiguration, daita: daita)
-                try self.setNetworkSettings(settingsGenerator.generateNetworkSettings())
 
                 let (exitWgConfig, resolutionResults) = settingsGenerator.uapiConfiguration()
                 let entryWgConfig = settingsGenerator.entryUapiConfiguration()?.0
@@ -325,15 +324,6 @@ public class WireGuardAdapter {
 
             switch self.state {
             case .started(let handle, _):
-                do {
-                    try self.setNetworkSettings(settingsGenerator.generateNetworkSettings())
-                } catch let error as WireGuardAdapterError {
-                    completionHandler(error)
-                    return
-                } catch {
-                    fatalError()
-                }
-
                 let (wgConfig, resolutionResults) = settingsGenerator.uapiConfiguration()
                 let (entryConfig, _) = settingsGenerator.entryUapiConfiguration() ?? (nil, [])
                 self.logEndpointResolutionResults(resolutionResults)
@@ -357,19 +347,6 @@ public class WireGuardAdapter {
                 }
 
             case .temporaryShutdown:
-                // On iOS 15.1 or newer, updating network settings may fail when in airplane mode.
-                // Network path monitor will retry updating settings later when connectivity is
-                // back online.
-                do {
-                    try self.setNetworkSettings(settingsGenerator.generateNetworkSettings())
-                } catch let error as WireGuardAdapterError {
-                    if case .setNetworkSettings(let systemError) = error {
-                        self.logHandler(.verbose, "Failed to set network settings while offline. Will retry when connectivity is back online. Error: \(systemError.localizedDescription)")
-                    }
-                } catch {
-                    fatalError()
-                }
-
                 self.state = .temporaryShutdown(settingsGenerator)
                 self.closeICMP()
 
@@ -396,43 +373,6 @@ public class WireGuardAdapter {
             let tunnelLogLevel = WireGuardLogLevel(rawValue: logLevel) ?? .verbose
 
             unretainedSelf.logHandler(tunnelLogLevel, swiftString)
-        }
-    }
-
-    /// Set network tunnel configuration.
-    /// This method ensures that the call to `setTunnelNetworkSettings` does not time out, as in
-    /// certain scenarios the completion handler given to it may not be invoked by the system.
-    ///
-    /// - Parameters:
-    ///   - networkSettings: an instance of type `NEPacketTunnelNetworkSettings`.
-    /// - Throws: an error of type `WireGuardAdapterError`.
-    /// - Returns: `PacketTunnelSettingsGenerator`.
-    private func setNetworkSettings(_ networkSettings: NEPacketTunnelNetworkSettings) throws {
-        var systemError: Error?
-
-        let dispatchGroup = DispatchGroup()
-
-        dispatchGroup.enter()
-
-        self.packetTunnelProvider?.setTunnelNetworkSettings(networkSettings) { error in
-            systemError = error
-            dispatchGroup.leave()
-        }
-
-        // Packet tunnel's `setTunnelNetworkSettings` times out in certain
-        // scenarios & never calls the given callback.
-        let setTunnelNetworkSettingsTimeout: Int = 5 // seconds
-
-        let waitResult = dispatchGroup.wait(wallTimeout: .now() + .seconds(setTunnelNetworkSettingsTimeout))
-
-        switch waitResult {
-        case .success:
-            if let systemError = systemError {
-                throw WireGuardAdapterError.setNetworkSettings(systemError)
-            }
-
-        case .timedOut:
-            self.logHandler(.error, "setTunnelNetworkSettings timed out after 5 seconds; proceeding anyway")
         }
     }
 
@@ -599,8 +539,6 @@ public class WireGuardAdapter {
 
 
             do {
-                try self.setNetworkSettings(settingsGenerator.generateNetworkSettings())
-
                 let (exitWgConfig, resolutionResults) = settingsGenerator.uapiConfiguration()
                 self.logEndpointResolutionResults(resolutionResults)
 
