@@ -53,6 +53,26 @@ func wgCloseInTunnelTCP(tunnelHandle int32, socketHandle int32) bool {
 	return tun.RemoveAndCloseSocket(socketHandle)
 }
 
+// chunkIterator returns a closure that returns successive chunks of the given
+// slice. Each call to the returned function returns the next chunk of size
+// chunkSize. The last chunk will have a size between 1 and maximum chunk size.
+// When no more data remains, the closure returns nil.
+func chunkIterator(data []byte, chunkSize int) func() []byte {
+	offset := 0
+	return func() []byte {
+		if offset >= len(data) {
+			return nil
+		}
+		end := offset + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		chunk := data[offset:end]
+		offset = end
+		return chunk
+	}
+}
+
 // Sends the data array into the TCP socket in a blocking fashion. The data
 // pointer should point to at least `dataLen` bytes for the entirety of this
 // call. This function is technically threadsafe, but multiple calls will not
@@ -75,17 +95,26 @@ func wgSendInTunnelTCP(tunnelHandle int32, socketHandle int32, data *byte, dataL
 		return errTCPNoSocket
 	}
 
-	n, err := socket.Write(unsafe.Slice(data, dataLen))
-	if err != nil {
-		tun.logger.Errorf("Failed to write to TCP connection: %v", err)
-		return errTCPWrite
+	originalBuffer := unsafe.Slice(data, dataLen)
+	totalBytesWritten := 0
+
+	nextChunk := chunkIterator(originalBuffer, 1000)
+	for chunk := nextChunk(); chunk != nil; chunk = nextChunk() {
+		n, err := socket.Write(chunk)
+		if err != nil {
+			tun.logger.Errorf("TCP Failed to write to TCP connection: %v", err)
+			return errTCPWrite
+		}
+
+		totalBytesWritten += n
 	}
-	if n != int(dataLen) {
-		tun.logger.Errorf("Expected to write %v bytes, instead wrote %v", err)
+
+	if totalBytesWritten != int(dataLen) {
+		tun.logger.Errorf("TCP Expected to write %v bytes, instead wrote %v", dataLen, totalBytesWritten)
 		return errTCPWrite
 	}
 
-	return int32(n)
+	return int32(totalBytesWritten)
 }
 
 // Blocking call to receive bytes into the buffer from a TCP connection. The

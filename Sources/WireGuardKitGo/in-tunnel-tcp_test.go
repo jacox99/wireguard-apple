@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/netip"
+	"reflect"
 	"testing"
 	"unsafe"
 
@@ -115,4 +116,80 @@ func TestInTunnelTCPShutdown(t *testing.T) {
 	}
 
 	wgTurnOff(tunnel)
+}
+
+func TestChunkIterator_EmptySlice(t *testing.T) {
+	data := []byte{}
+	nextChunk := chunkIterator(data, 10)
+
+	chunk := nextChunk()
+	if chunk != nil {
+		t.Errorf("Expected nil for empty slice, got %v", chunk)
+	}
+}
+
+func TestChunkIterator_MultipleChunks(t *testing.T) {
+	data := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	nextChunk := chunkIterator(data, 3)
+
+	// First chunk
+	chunk := nextChunk()
+	expected := []byte{1, 2, 3}
+	if !reflect.DeepEqual(chunk, expected) {
+		t.Errorf("Chunk 1: Expected %v, got %v", expected, chunk)
+	}
+
+	// Second chunk
+	chunk = nextChunk()
+	expected = []byte{4, 5, 6}
+	if !reflect.DeepEqual(chunk, expected) {
+		t.Errorf("Chunk 2: Expected %v, got %v", expected, chunk)
+	}
+
+	// Third chunk
+	chunk = nextChunk()
+	expected = []byte{7, 8, 9}
+	if !reflect.DeepEqual(chunk, expected) {
+		t.Errorf("Chunk 3: Expected %v, got %v", expected, chunk)
+	}
+
+	// Fourth chunk (partial)
+	chunk = nextChunk()
+	expected = []byte{10}
+	if !reflect.DeepEqual(chunk, expected) {
+		t.Errorf("Chunk 4: Expected %v, got %v", expected, chunk)
+	}
+
+	// No more chunks
+	chunk = nextChunk()
+	if chunk != nil {
+		t.Errorf("Expected nil after exhausting chunks, got %v", chunk)
+	}
+}
+
+
+func TestChunkIterator_SliceValidity(t *testing.T) {
+	// Test that returned slices are valid views into the original data
+	data := []byte{1, 2, 3, 4, 5, 6}
+	nextChunk := chunkIterator(data, 2)
+
+	chunk1 := nextChunk()
+	chunk2 := nextChunk()
+	chunk3 := nextChunk()
+
+	// Modify the original data
+	data[1] = 99
+	data[3] = 88
+	data[5] = 77
+
+	// Chunks should reflect the changes (they're slices of the original)
+	if chunk1[1] != 99 {
+		t.Errorf("Expected chunk1[1] to be 99, got %d", chunk1[1])
+	}
+	if chunk2[1] != 88 {
+		t.Errorf("Expected chunk2[1] to be 88, got %d", chunk2[1])
+	}
+	if chunk3[1] != 77 {
+		t.Errorf("Expected chunk3[1] to be 77, got %d", chunk3[1])
+	}
 }
