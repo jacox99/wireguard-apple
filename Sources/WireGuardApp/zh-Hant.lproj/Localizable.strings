@@ -59,6 +59,9 @@
 "macToggleStatusButtonReasserting" = "重新啟用中...";
 "macToggleStatusButtonRestarting" = "重新啟動中....";
 "macToggleStatusButtonWaiting" = "等待中...";
+"macToggleStatusButtonEnableOnDemand" = "啟用依需求連線";
+"macToggleStatusButtonDisableOnDemand" = "停用依需求連線";
+"macToggleStatusButtonDisableOnDemandDeactivate" = "停用依需求連線並關閉";
 
 "tunnelSectionTitleInterface" = "介面";
 

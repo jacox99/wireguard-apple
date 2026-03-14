@@ -62,6 +62,9 @@
 "macToggleStatusButtonReasserting" = "正在重新启动…";
 "macToggleStatusButtonRestarting" = "重启中…";
 "macToggleStatusButtonWaiting" = "等待中...";
+"macToggleStatusButtonEnableOnDemand" = "启用按需连接";
+"macToggleStatusButtonDisableOnDemand" = "停用按需连接";
+"macToggleStatusButtonDisableOnDemandDeactivate" = "停用按需连接并关闭";
 
 "tunnelSectionTitleInterface" = "接口";
 
