@@ -1,0 +1,5 @@
+module WireGuardKitObfuscator {
+    header "wg_obfuscator_adapter.h"
+    link "c"
+    export *
+}

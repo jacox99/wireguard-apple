@@ -69,6 +69,22 @@ class TunnelViewModel {
         .excludePrivateIPs, .deletePeer
     ]
 
+    enum ObfuscatorField: CaseIterable {
+        case enabled
+        case key
+        case maskingType
+        case maxDummyLength
+
+        var localizedUIString: String {
+            switch self {
+            case .enabled: return tr("tunnelObfuscatorEnabled")
+            case .key: return tr("tunnelObfuscatorKey")
+            case .maskingType: return tr("tunnelObfuscatorMaskingType")
+            case .maxDummyLength: return tr("tunnelObfuscatorMaxDummyLength")
+            }
+        }
+    }
+
     static let keyLengthInBase64 = 44
 
     struct Changes {
@@ -480,6 +496,91 @@ class TunnelViewModel {
         }
     }
 
+    class ObfuscatorData {
+        var scratchpad = [ObfuscatorField: String]()
+        var validatedConfiguration: ObfuscatorConfiguration?
+
+        subscript(field: ObfuscatorField) -> String {
+            get {
+                if scratchpad.isEmpty {
+                    populateScratchpad()
+                }
+                return scratchpad[field] ?? ""
+            }
+            set(stringValue) {
+                if scratchpad.isEmpty {
+                    populateScratchpad()
+                }
+                validatedConfiguration = nil
+                if stringValue.isEmpty {
+                    scratchpad.removeValue(forKey: field)
+                } else {
+                    scratchpad[field] = stringValue
+                }
+            }
+        }
+
+        func populateScratchpad() {
+            guard let config = validatedConfiguration else { return }
+            scratchpad[.enabled] = config.isEnabled ? "true" : "false"
+            scratchpad[.key] = config.key
+            scratchpad[.maskingType] = config.maskingType.rawValue
+            scratchpad[.maxDummyLength] = String(config.maxDummyLength)
+        }
+
+        private static func createScratchPad(from config: ObfuscatorConfiguration) -> [ObfuscatorField: String] {
+            var scratchpad = [ObfuscatorField: String]()
+            scratchpad[.enabled] = config.isEnabled ? "true" : "false"
+            scratchpad[.key] = config.key
+            scratchpad[.maskingType] = config.maskingType.rawValue
+            scratchpad[.maxDummyLength] = String(config.maxDummyLength)
+            return scratchpad
+        }
+
+        func save() -> ObfuscatorConfiguration {
+            if let config = validatedConfiguration {
+                return config
+            }
+            var config = ObfuscatorConfiguration()
+            config.isEnabled = scratchpad[.enabled] == "true"
+            config.key = scratchpad[.key] ?? ""
+            if let maskingTypeString = scratchpad[.maskingType],
+               let maskingType = ObfuscatorConfiguration.MaskingType(rawValue: maskingTypeString) {
+                config.maskingType = maskingType
+            }
+            if let maxDummyLengthString = scratchpad[.maxDummyLength],
+               let maxDummyLength = UInt16(maxDummyLengthString) {
+                config.maxDummyLength = maxDummyLength
+            }
+            validatedConfiguration = config
+            return config
+        }
+
+        func applyConfiguration(other: ObfuscatorConfiguration) -> [ObfuscatorField: Changes.FieldChange] {
+            if scratchpad.isEmpty {
+                populateScratchpad()
+            }
+            let otherScratchPad = ObfuscatorData.createScratchPad(from: other)
+            var changes = [ObfuscatorField: Changes.FieldChange]()
+            for field in ObfuscatorField.allCases {
+                switch (scratchpad[field] ?? "", otherScratchPad[field] ?? "") {
+                case ("", ""):
+                    break
+                case ("", _):
+                    changes[field] = .added
+                case (_, ""):
+                    changes[field] = .removed
+                case (let this, let other):
+                    if this != other {
+                        changes[field] = .modified(newValue: other)
+                    }
+                }
+            }
+            scratchpad = otherScratchPad
+            return changes
+        }
+    }
+
     enum SaveResult<Configuration> {
         case saved(Configuration)
         case error(String)
@@ -487,10 +588,12 @@ class TunnelViewModel {
 
     private(set) var interfaceData: InterfaceData
     private(set) var peersData: [PeerData]
+    private(set) var obfuscatorData: ObfuscatorData
 
     init(tunnelConfiguration: TunnelConfiguration?) {
         let interfaceData = InterfaceData()
         var peersData = [PeerData]()
+        let obfuscatorData = ObfuscatorData()
         if let tunnelConfiguration = tunnelConfiguration {
             interfaceData.validatedConfiguration = tunnelConfiguration.interface
             interfaceData.validatedName = tunnelConfiguration.name
@@ -498,6 +601,9 @@ class TunnelViewModel {
                 let peerData = PeerData(index: index)
                 peerData.validatedConfiguration = peerConfiguration
                 peersData.append(peerData)
+            }
+            if let obfuscatorConfig = tunnelConfiguration.obfuscatorConfig {
+                obfuscatorData.validatedConfiguration = obfuscatorConfig
             }
         }
         let numberOfPeers = peersData.count
@@ -507,6 +613,7 @@ class TunnelViewModel {
         }
         self.interfaceData = interfaceData
         self.peersData = peersData
+        self.obfuscatorData = obfuscatorData
     }
 
     func appendEmptyPeer() {
@@ -566,7 +673,8 @@ class TunnelViewModel {
                 return .error(tr("alertInvalidPeerMessagePublicKeyDuplicated"))
             }
 
-            let tunnelConfiguration = TunnelConfiguration(name: interfaceConfiguration.0, interface: interfaceConfiguration.1, peers: peerConfigurations)
+            var tunnelConfiguration = TunnelConfiguration(name: interfaceConfiguration.0, interface: interfaceConfiguration.1, peers: peerConfigurations)
+            tunnelConfiguration.obfuscatorConfig = obfuscatorData.save()
             return .saved(tunnelConfiguration)
         }
     }

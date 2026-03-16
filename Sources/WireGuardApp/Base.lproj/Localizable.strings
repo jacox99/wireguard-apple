@@ -96,6 +96,16 @@
 "tunnelPeerLastHandshakeTime" = "Latest handshake";
 "tunnelPeerExcludePrivateIPs" = "Exclude private IPs";
 
+"tunnelSectionTitleObfuscator" = "Obfuscator";
+"tunnelObfuscatorEnabled" = "Enabled";
+"tunnelObfuscatorKey" = "Key";
+"tunnelObfuscatorMaskingType" = "Masking Type";
+"tunnelObfuscatorMaxDummyLength" = "Max Dummy Length";
+"tunnelObfuscatorMaskingNone" = "None";
+"tunnelObfuscatorMaskingAuto" = "Auto";
+"tunnelObfuscatorMaskingSTUN" = "STUN";
+"tunnelObfuscatorGenerateKey" = "Generate Key";
+
 "tunnelSectionTitleOnDemand" = "On-Demand Activation";
 
 "tunnelOnDemandCellular" = "Cellular";

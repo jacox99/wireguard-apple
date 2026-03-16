@@ -8,6 +8,7 @@ extension TunnelConfiguration {
     enum ParserState {
         case inInterfaceSection
         case inPeerSection
+        case inObfuscatorSection
         case notInASection
     }
 
@@ -33,11 +34,16 @@ extension TunnelConfiguration {
         case peerHasUnrecognizedKey(String)
         case multiplePeersWithSamePublicKey
         case multipleEntriesForKey(String)
+        case obfuscatorHasInvalidKey(String)
+        case obfuscatorHasInvalidMaskingType(String)
+        case obfuscatorHasInvalidMaxDummyLength(String)
+        case obfuscatorHasUnrecognizedKey(String)
     }
 
     convenience init(fromWgQuickConfig wgQuickConfig: String, called name: String? = nil) throws {
         var interfaceConfiguration: InterfaceConfiguration?
         var peerConfigurations = [PeerConfiguration]()
+        var obfuscatorConfiguration: ObfuscatorConfiguration?
 
         let lines = wgQuickConfig.split { $0.isNewline }
 
@@ -73,6 +79,7 @@ extension TunnelConfiguration {
                     }
                     let interfaceSectionKeys: Set<String> = ["privatekey", "listenport", "address", "dns", "mtu"]
                     let peerSectionKeys: Set<String> = ["publickey", "presharedkey", "allowedips", "endpoint", "persistentkeepalive"]
+                    let obfuscatorSectionKeys: Set<String> = ["enabled", "key", "masking", "maxdummylength"]
                     if parserState == .inInterfaceSection {
                         guard interfaceSectionKeys.contains(key) else {
                             throw ParseError.interfaceHasUnrecognizedKey(keyWithCase)
@@ -81,15 +88,19 @@ extension TunnelConfiguration {
                         guard peerSectionKeys.contains(key) else {
                             throw ParseError.peerHasUnrecognizedKey(keyWithCase)
                         }
+                    } else if parserState == .inObfuscatorSection {
+                        guard obfuscatorSectionKeys.contains(key) else {
+                            throw ParseError.obfuscatorHasUnrecognizedKey(keyWithCase)
+                        }
                     }
-                } else if lowercasedLine != "[interface]" && lowercasedLine != "[peer]" {
+                } else if lowercasedLine != "[interface]" && lowercasedLine != "[peer]" && lowercasedLine != "[obfuscator]" {
                     throw ParseError.invalidLine(line)
                 }
             }
 
             let isLastLine = lineIndex == lines.count - 1
 
-            if isLastLine || lowercasedLine == "[interface]" || lowercasedLine == "[peer]" {
+            if isLastLine || lowercasedLine == "[interface]" || lowercasedLine == "[peer]" || lowercasedLine == "[obfuscator]" {
                 // Previous section has ended; process the attributes collected so far
                 if parserState == .inInterfaceSection {
                     let interface = try TunnelConfiguration.collate(interfaceAttributes: attributes)
@@ -98,6 +109,8 @@ extension TunnelConfiguration {
                 } else if parserState == .inPeerSection {
                     let peer = try TunnelConfiguration.collate(peerAttributes: attributes)
                     peerConfigurations.append(peer)
+                } else if parserState == .inObfuscatorSection {
+                    obfuscatorConfiguration = try TunnelConfiguration.collate(obfuscatorAttributes: attributes)
                 }
             }
 
@@ -106,6 +119,9 @@ extension TunnelConfiguration {
                 attributes.removeAll()
             } else if lowercasedLine == "[peer]" {
                 parserState = .inPeerSection
+                attributes.removeAll()
+            } else if lowercasedLine == "[obfuscator]" {
+                parserState = .inObfuscatorSection
                 attributes.removeAll()
             }
         }
@@ -117,7 +133,7 @@ extension TunnelConfiguration {
         }
 
         if let interfaceConfiguration = interfaceConfiguration {
-            self.init(name: name, interface: interfaceConfiguration, peers: peerConfigurations)
+            self.init(name: name, interface: interfaceConfiguration, peers: peerConfigurations, obfuscatorConfig: obfuscatorConfiguration)
         } else {
             throw ParseError.noInterface
         }
@@ -159,6 +175,17 @@ extension TunnelConfiguration {
             if let persistentKeepAlive = peer.persistentKeepAlive {
                 output.append("PersistentKeepalive = \(persistentKeepAlive)\n")
             }
+        }
+
+        // Add Obfuscator section if configured
+        if let obfuscatorConfig = obfuscatorConfig, obfuscatorConfig.isEnabled {
+            output.append("\n[Obfuscator]\n")
+            output.append("Enabled = yes\n")
+            if !obfuscatorConfig.key.isEmpty {
+                output.append("Key = \(obfuscatorConfig.key)\n")
+            }
+            output.append("Masking = \(obfuscatorConfig.maskingType.rawValue)\n")
+            output.append("MaxDummyLength = \(obfuscatorConfig.maxDummyLength)\n")
         }
 
         return output
@@ -247,6 +274,43 @@ extension TunnelConfiguration {
             peer.persistentKeepAlive = persistentKeepAlive
         }
         return peer
+    }
+
+    private static func collate(obfuscatorAttributes attributes: [String: String]) throws -> ObfuscatorConfiguration {
+        var config = ObfuscatorConfiguration()
+
+        // Parse Enabled
+        if let enabledString = attributes["enabled"] {
+            let lowercased = enabledString.lowercased()
+            config.isEnabled = (lowercased == "yes" || lowercased == "true" || lowercased == "1")
+        }
+
+        // Parse Key
+        if let key = attributes["key"] {
+            guard !key.isEmpty else {
+                throw ParseError.obfuscatorHasInvalidKey(key)
+            }
+            config.key = key
+        }
+
+        // Parse MaskingType
+        if let maskingString = attributes["masking"] {
+            let uppercased = maskingString.uppercased()
+            guard let maskingType = ObfuscatorConfiguration.MaskingType(rawValue: uppercased) else {
+                throw ParseError.obfuscatorHasInvalidMaskingType(maskingString)
+            }
+            config.maskingType = maskingType
+        }
+
+        // Parse MaxDummyLength
+        if let maxDummyLengthString = attributes["maxdummylength"] {
+            guard let maxDummyLength = UInt16(maxDummyLengthString) else {
+                throw ParseError.obfuscatorHasInvalidMaxDummyLength(maxDummyLengthString)
+            }
+            config.maxDummyLength = min(maxDummyLength, 1024)
+        }
+
+        return config
     }
 
 }

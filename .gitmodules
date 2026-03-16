@@ -1,3 +1,6 @@
 [submodule "Sources/WireGuardKitGo/wireguard-go"]
 	path = Sources/WireGuardKitGo/wireguard-go
 	url = https://github.com/mullvad/wireguard-go
+[submodule "Sources/WireGuardKitObfuscator/wg-obfuscator"]
+	path = Sources/WireGuardKitObfuscator/wg-obfuscator
+	url = https://github.com/ClusterM/wg-obfuscator.git

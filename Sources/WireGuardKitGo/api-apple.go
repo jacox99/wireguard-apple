@@ -19,6 +19,14 @@ typedef struct {
     double maybeNotMaxPadding;
     double maybeNotMaxBlocking;
 } DaitaGoParameters;
+
+typedef struct {
+    uint8_t enabled;
+    char *key;
+    uint32_t key_length;
+    uint8_t masking_type;
+    uint16_t max_dummy_length;
+} ObfuscatorGoParameters;
 */
 import "C"
 
@@ -75,6 +83,8 @@ const (
 	errTCPNoSocket = -21
 	errTCPWrite    = -22
 	errTCPRead     = -23
+	// Obfuscator errors
+	errObfuscatorInit = -24
 )
 
 var loggerFunc unsafe.Pointer
@@ -118,6 +128,25 @@ func daitaParametersFromRaw(maybeNotMachines *C.char, p *C.DaitaGoParameters) *d
 		MaybeNotMaxActions:  uint32(p.maybeNotMaxActions),
 		MaybeNotMaxPadding:  float64(p.maybeNotMaxPadding),
 		MaybeNotMaxBlocking: float64(p.maybeNotMaxBlocking),
+	}
+}
+
+type obfuscatorParameters struct {
+	Enabled        bool
+	Key            string
+	MaskingType    ObfuscatorMaskingType
+	MaxDummyLength uint16
+}
+
+func obfuscatorParametersFromRaw(p *C.ObfuscatorGoParameters) *obfuscatorParameters {
+	if p == nil || p.enabled == 0 {
+		return nil
+	}
+	return &obfuscatorParameters{
+		Enabled:        p.enabled != 0,
+		Key:            C.GoStringN(p.key, C.int(p.key_length)),
+		MaskingType:    ObfuscatorMaskingType(p.masking_type),
+		MaxDummyLength: uint16(p.max_dummy_length),
 	}
 }
 
@@ -262,7 +291,7 @@ func wgTurnOn(settings *C.char, tunFd int32, maybeNotMachines *C.char, daitaPara
 	return addTunnelFromDevice(dev, nil, C.GoString(settings), "", nil, logger, daitaParams)
 }
 
-func wgTurnOnIANFromExistingTunnel(tun tun.Device, settings string, privateAddr netip.Addr, daitaParameters *daitaParameters) int32 {
+func wgTurnOnIANFromExistingTunnel(tun tun.Device, settings string, privateAddr netip.Addr, daitaParameters *daitaParameters, obfuscatorParams *obfuscatorParameters) int32 {
 	logger := &device.Logger{
 		Verbosef: CLogger(0).Printf,
 		Errorf:   CLogger(1).Printf,
@@ -282,15 +311,31 @@ func wgTurnOnIANFromExistingTunnel(tun tun.Device, settings string, privateAddr 
 		return errNoVirtualNet
 	}
 
+	// Create bind - optionally wrap with obfuscator
+	var bind conn.Bind = conn.NewStdNetBind()
+	var obfsHandle *ObfuscatorHandle
+
+	if obfuscatorParams != nil && obfuscatorParams.Enabled {
+		var err error
+		obfsHandle, err = NewObfuscator(obfuscatorParams.Key, obfuscatorParams.MaskingType, obfuscatorParams.MaxDummyLength)
+		if err != nil {
+			logger.Errorf("Failed to create obfuscator: %v", err)
+			tun.Close()
+			return errObfuscatorInit
+		}
+		bind = NewObfuscatorBind(bind, obfsHandle)
+		logger.Verbosef("Obfuscation enabled with masking type %d", obfuscatorParams.MaskingType)
+	}
+
 	wrapper := NewRouter(tun, vtun)
 	logger.Verbosef("Attaching to interface")
-	dev := device.NewDevice(&wrapper, conn.NewStdNetBind(), logger)
+	dev := device.NewDevice(&wrapper, bind, logger)
 
 	return addTunnelFromDevice(dev, nil, settings, "", virtualNet, logger, daitaParameters)
 }
 
 //export wgTurnOnIAN
-func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachines *C.char, daitaParameters *C.DaitaGoParameters) int32 {
+func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachines *C.char, daitaParameters *C.DaitaGoParameters, obfuscatorParameters *C.ObfuscatorGoParameters) int32 {
 	logger := &device.Logger{
 		Verbosef: CLogger(0).Printf,
 		Errorf:   CLogger(1).Printf,
@@ -309,7 +354,8 @@ func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachi
 	}
 
 	daitaParams := daitaParametersFromRaw(maybeNotMachines, daitaParameters)
-	return wgTurnOnIANFromExistingTunnel(tun, C.GoString(settings), privateAddr, daitaParams)
+	obfsParams := obfuscatorParametersFromRaw(obfuscatorParameters)
+	return wgTurnOnIANFromExistingTunnel(tun, C.GoString(settings), privateAddr, daitaParams, obfsParams)
 }
 
 //export wgTurnOff

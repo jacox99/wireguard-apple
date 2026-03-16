@@ -211,7 +211,7 @@ public class WireGuardAdapter {
         }
     }
 
-    public func startMultihop(exitConfiguration: TunnelConfiguration, entryConfiguration: TunnelConfiguration?, daita: DaitaConfiguration? = nil, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+    public func startMultihop(exitConfiguration: TunnelConfiguration, entryConfiguration: TunnelConfiguration?, daita: DaitaConfiguration? = nil, obfuscator: ObfuscatorConfiguration? = nil, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             guard case .stopped = self.state else {
                 completionHandler(.invalidState)
@@ -235,7 +235,7 @@ public class WireGuardAdapter {
                 self.logEndpointResolutionResults(resolutionResults)
 
                 self.state = .started(
-                    try self.startWireGuardBackend(exitWgConfig: exitWgConfig, privateAddress: privateAddress, entryWgConfig: entryWgConfig, mtu: 1280, daita: daita),
+                    try self.startWireGuardBackend(exitWgConfig: exitWgConfig, privateAddress: privateAddress, entryWgConfig: entryWgConfig, mtu: 1280, daita: daita, obfuscator: obfuscator),
                     settingsGenerator
                 )
 
@@ -258,8 +258,8 @@ public class WireGuardAdapter {
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
     ///   - completionHandler: completion handler.
-    public func start(tunnelConfiguration: TunnelConfiguration, daita: DaitaConfiguration? = nil, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
-        startMultihop(exitConfiguration: tunnelConfiguration, entryConfiguration: nil, daita: daita, completionHandler: completionHandler)
+    public func start(tunnelConfiguration: TunnelConfiguration, daita: DaitaConfiguration? = nil, obfuscator: ObfuscatorConfiguration? = nil, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+        startMultihop(exitConfiguration: tunnelConfiguration, entryConfiguration: nil, daita: daita, obfuscator: obfuscator, completionHandler: completionHandler)
     }
 
     /// Stop the tunnel.
@@ -407,18 +407,19 @@ public class WireGuardAdapter {
     /// - Parameter wgConfig: WireGuard configuration
     /// - Throws: an error of type `WireGuardAdapterError`
     /// - Returns: tunnel handle
-    private func startWireGuardBackend(exitWgConfig: String, privateAddress: IPAddress, entryWgConfig: String? = nil, mtu: UInt16 = 1280, daita: DaitaConfiguration?) throws -> Int32 {
+    private func startWireGuardBackend(exitWgConfig: String, privateAddress: IPAddress, entryWgConfig: String? = nil, mtu: UInt16 = 1280, daita: DaitaConfiguration?, obfuscator: ObfuscatorConfiguration?) throws -> Int32 {
         guard let tunnelFileDescriptor = self.tunnelFileDescriptor else {
             throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
         }
 
         var params = DaitaGoParameters(daita: daita)
+        var obfsParams = ObfuscatorGoParameters(obfuscator: obfuscator)
         let privateAddr = "\(privateAddress)"
 
         let handle = if let entryWgConfig {
-            wgTurnOnMultihop(exitWgConfig, entryWgConfig, privateAddr, tunnelFileDescriptor, daita?.machines ?? nil, &params)
+            wgTurnOnMultihop(exitWgConfig, entryWgConfig, privateAddr, tunnelFileDescriptor, daita?.machines ?? nil, &params, &obfsParams)
         } else {
-            wgTurnOnIAN(exitWgConfig, tunnelFileDescriptor, privateAddr, daita?.machines ?? nil, &params)
+            wgTurnOnIAN(exitWgConfig, tunnelFileDescriptor, privateAddr, daita?.machines ?? nil, &params, &obfsParams)
         }
         if handle < 0 {
             throw WireGuardAdapterError.startWireGuardBackend(handle)
@@ -543,7 +544,7 @@ public class WireGuardAdapter {
                 self.logEndpointResolutionResults(resolutionResults)
 
                 self.state = .started(
-                    try self.startWireGuardBackend(exitWgConfig: exitWgConfig, privateAddress: privateAddress, daita: settingsGenerator.daita),
+                    try self.startWireGuardBackend(exitWgConfig: exitWgConfig, privateAddress: privateAddress, daita: settingsGenerator.daita, obfuscator: settingsGenerator.exit.configuration.obfuscatorConfig),
                     settingsGenerator
                 )
 
@@ -686,5 +687,32 @@ extension DaitaGoParameters {
         maybeNotMaxActions = daita?.maxActions ?? 0
         maybeNotMaxPadding = daita?.maxPadding ?? 0
         maybeNotMaxBlocking = daita?.maxBlocking ?? 0
+    }
+}
+
+extension ObfuscatorGoParameters {
+    init(obfuscator: ObfuscatorConfiguration?) {
+        self = ObfuscatorGoParameters()
+        if let obfuscator = obfuscator, obfuscator.isEnabled {
+            enabled = 1
+            key = (obfuscator.key as NSString).utf8String
+            key_length = UInt32(obfuscator.key.count)
+            // Map MaskingType to UInt8: none=0, auto=1, stun=2
+            switch obfuscator.maskingType {
+            case .none:
+                masking_type = 0
+            case .auto:
+                masking_type = 1
+            case .stun:
+                masking_type = 2
+            }
+            max_dummy_length = obfuscator.maxDummyLength
+        } else {
+            enabled = 0
+            key = nil
+            key_length = 0
+            masking_type = 0
+            max_dummy_length = 0
+        }
     }
 }

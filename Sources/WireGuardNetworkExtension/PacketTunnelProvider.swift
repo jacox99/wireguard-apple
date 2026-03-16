@@ -29,7 +29,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
 
         // Start the tunnel
-        adapter.start(tunnelConfiguration: tunnelConfiguration) { adapterError in
+        adapter.start(tunnelConfiguration: tunnelConfiguration, obfuscator: tunnelConfiguration.obfuscatorConfig) { adapterError in
             guard let adapterError = adapterError else {
                 let interfaceName = self.adapter.interfaceName ?? "unknown"
 

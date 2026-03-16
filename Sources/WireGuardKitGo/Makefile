@@ -48,13 +48,16 @@ $(GOROOT)/.prepared:
 	cat goruntime-*.diff | patch -p1 -f -N -r- -d "$(GOROOT)"
 	touch "$@"
 
+OBFUSCATOR_DIR := $(CURDIR)/../WireGuardKitObfuscator
+OBFUSCATOR_CFLAGS := -I$(OBFUSCATOR_DIR) -I$(OBFUSCATOR_DIR)/wg-obfuscator
+
 define libwg-go-a
 $(BUILDDIR)/libwg-go-$(1).a: export CGO_ENABLED := 1
-$(BUILDDIR)/libwg-go-$(1).a: export CGO_CFLAGS := $(CFLAGS_PREFIX) $(ARCH)
-$(BUILDDIR)/libwg-go-$(1).a: export CGO_LDFLAGS := $(CFLAGS_PREFIX) $(ARCH)
+$(BUILDDIR)/libwg-go-$(1).a: export CGO_CFLAGS := $(CFLAGS_PREFIX) $(ARCH) $(OBFUSCATOR_CFLAGS)
+$(BUILDDIR)/libwg-go-$(1).a: export CGO_LDFLAGS := $(CFLAGS_PREFIX) $(ARCH) $(BUILDDIR)/libobfuscator-$(1).a
 $(BUILDDIR)/libwg-go-$(1).a: export GOOS := $(GOOS_$(PLATFORM_NAME))
 $(BUILDDIR)/libwg-go-$(1).a: export GOARCH := $(GOARCH_$(1))
-$(BUILDDIR)/libwg-go-$(1).a: $(GOROOT)/.prepared go.mod
+$(BUILDDIR)/libwg-go-$(1).a: $(GOROOT)/.prepared go.mod $(BUILDDIR)/libobfuscator-$(1).a
 	git submodule update --init --recursive
 	CARGO_TARGET_DIR="$(BUILDDIR)/target" \
 			DESTINATION="$(BUILT_PRODUCTS_DIR)" \
@@ -64,6 +67,12 @@ $(BUILDDIR)/libwg-go-$(1).a: $(GOROOT)/.prepared go.mod
 			make -C wireguard-go/maybenot/crates/maybenot-ffi
 	go build --tags daita -ldflags=-w -trimpath -ldflags=L=$(BUILDDIR)/ -v -o "$(BUILDDIR)/libwg-go-$(1).a" -buildmode c-archive
 	rm -f "$(BUILDDIR)/libwg-go-$(1).h"
+
+# Compile obfuscator C code for each architecture
+$(BUILDDIR)/libobfuscator-$(1).a: $(OBFUSCATOR_DIR)/wg_obfuscator_adapter.c
+	@mkdir -p $(BUILDDIR)
+	$(CC) $(CFLAGS_PREFIX) $(1) $(OBFUSCATOR_CFLAGS) -c -o $(BUILDDIR)/wg_obfuscator_adapter-$(1).o $(OBFUSCATOR_DIR)/wg_obfuscator_adapter.c
+	ar rcs $(BUILDDIR)/libobfuscator-$(1).a $(BUILDDIR)/wg_obfuscator_adapter-$(1).o
 endef
 $(foreach ARCH,$(ARCHS),$(eval $(call libwg-go-a,$(ARCH))))
 

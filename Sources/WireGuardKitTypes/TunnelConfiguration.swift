@@ -9,12 +9,14 @@ public final class TunnelConfiguration {
     public var interface: InterfaceConfiguration
     public let peers: [PeerConfiguration]
     public let pingableGateway: IPv4Address?
+    public var obfuscatorConfig: ObfuscatorConfiguration?
 
-    public init(name: String?, interface: InterfaceConfiguration, peers: [PeerConfiguration], pingableGateway: IPv4Address? = nil) {
+    public init(name: String?, interface: InterfaceConfiguration, peers: [PeerConfiguration], pingableGateway: IPv4Address? = nil, obfuscatorConfig: ObfuscatorConfiguration? = nil) {
         self.interface = interface
         self.peers = peers
         self.name = name
         self.pingableGateway = pingableGateway
+        self.obfuscatorConfig = obfuscatorConfig
 
         let peerPublicKeysArray = peers.map { $0.publicKey }
         let peerPublicKeysSet = Set<PublicKey>(peerPublicKeysArray)
@@ -28,7 +30,8 @@ extension TunnelConfiguration: Equatable {
     public static func == (lhs: TunnelConfiguration, rhs: TunnelConfiguration) -> Bool {
         return lhs.name == rhs.name &&
             lhs.interface == rhs.interface &&
-            Set(lhs.peers) == Set(rhs.peers)
+            Set(lhs.peers) == Set(rhs.peers) &&
+            lhs.obfuscatorConfig == rhs.obfuscatorConfig
     }
 }
 

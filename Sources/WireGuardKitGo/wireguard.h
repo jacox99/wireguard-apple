@@ -17,12 +17,20 @@ typedef struct {
     double maybeNotMaxBlocking;
 } DaitaGoParameters;
 
+typedef struct {
+    uint8_t enabled;
+    const char *key;
+    uint32_t key_length;
+    uint8_t masking_type;
+    uint16_t max_dummy_length;
+} ObfuscatorGoParameters;
+
 extern void test_daita(DaitaGoParameters *context);
 typedef void(*logger_fn_t)(void *context, int level, const char *msg);
 extern void wgSetLogger(void *context, logger_fn_t logger_fn);
-extern int wgTurnOnIAN(const char *settings, int32_t tun_fd, const char *private_ip, const char *maybeNotMachines, DaitaGoParameters *daitaParameters);
-extern int wgTurnOn(const char *settings, int32_t tun_fd, const char *maybeNotMachines, DaitaGoParameters *daitaParameters);
-extern int wgTurnOnMultihop(const char *exitSettings, const char *entrySettings, const char *privateIp, int32_t tun_fd, const char *maybenotMachines, DaitaGoParameters *daitaParameters);
+extern int wgTurnOnIAN(const char *settings, int32_t tun_fd, const char *private_ip, const char *maybeNotMachines, DaitaGoParameters *daitaParameters, ObfuscatorGoParameters *obfuscatorParameters);
+extern int wgTurnOn(const char *settings, int32_t tun_fd, const char *maybeNotMachines, DaitaGoParameters *daitaParameters, ObfuscatorGoParameters *obfuscatorParameters);
+extern int wgTurnOnMultihop(const char *exitSettings, const char *entrySettings, const char *privateIp, int32_t tun_fd, const char *maybenotMachines, DaitaGoParameters *daitaParameters, ObfuscatorGoParameters *obfuscatorParameters);
 extern void wgTurnOff(int handle);
 extern int64_t wgSetConfig(int handle, const char *exitSettings, const char *entrySettings);
 extern char *wgGetConfig(int handle);

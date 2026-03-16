@@ -13,12 +13,14 @@ class TunnelEditTableViewController: UITableViewController {
         case interface
         case peer(_ peer: TunnelViewModel.PeerData)
         case addPeer
+        case obfuscator
         case onDemand
 
         static func == (lhs: Section, rhs: Section) -> Bool {
             switch (lhs, rhs) {
             case (.interface, .interface),
                  (.addPeer, .addPeer),
+                 (.obfuscator, .obfuscator),
                  (.onDemand, .onDemand):
                 return true
             case let (.peer(peerA), .peer(peerB)):
@@ -47,6 +49,13 @@ class TunnelEditTableViewController: UITableViewController {
         .nonWiFiInterface,
         .wiFiInterface,
         .ssid
+    ]
+
+    let obfuscatorFields: [TunnelViewModel.ObfuscatorField] = [
+        .enabled,
+        .key,
+        .maskingType,
+        .maxDummyLength
     ]
 
     let tunnelsManager: TunnelsManager
@@ -100,6 +109,7 @@ class TunnelEditTableViewController: UITableViewController {
         interfaceFieldsBySection.forEach { _ in sections.append(.interface) }
         tunnelViewModel.peersData.forEach { sections.append(.peer($0)) }
         sections.append(.addPeer)
+        sections.append(.obfuscator)
         sections.append(.onDemand)
     }
 
@@ -161,6 +171,8 @@ extension TunnelEditTableViewController {
             return peerFieldsToShow.count
         case .addPeer:
             return 1
+        case .obfuscator:
+            return obfuscatorFields.count
         case .onDemand:
             if onDemandViewModel.isWiFiInterfaceEnabled {
                 return 3
@@ -178,6 +190,8 @@ extension TunnelEditTableViewController {
             return tr("tunnelSectionTitlePeer")
         case .addPeer:
             return nil
+        case .obfuscator:
+            return tr("tunnelSectionTitleObfuscator")
         case .onDemand:
             return tr("tunnelSectionTitleOnDemand")
         }
@@ -191,6 +205,8 @@ extension TunnelEditTableViewController {
             return peerCell(for: tableView, at: indexPath, with: peerData)
         case .addPeer:
             return addPeerCell(for: tableView, at: indexPath)
+        case .obfuscator:
+            return obfuscatorCell(for: tableView, at: indexPath)
         case .onDemand:
             return onDemandCell(for: tableView, at: indexPath)
         }
@@ -447,6 +463,47 @@ extension TunnelEditTableViewController {
             let cell: ChevronCell = tableView.dequeueReusableCell(for: indexPath)
             cell.message = field.localizedUIString
             cell.detailMessage = onDemandViewModel.localizedSSIDDescription
+            return cell
+        }
+    }
+
+    private func obfuscatorCell(for tableView: UITableView, at indexPath: IndexPath) -> UITableViewCell {
+        let field = obfuscatorFields[indexPath.row]
+        switch field {
+        case .enabled:
+            let cell: SwitchCell = tableView.dequeueReusableCell(for: indexPath)
+            cell.message = field.localizedUIString
+            cell.isOn = tunnelViewModel.obfuscatorData[.enabled] == "true"
+            cell.onSwitchToggled = { [weak self] isOn in
+                guard let self = self else { return }
+                self.tunnelViewModel.obfuscatorData[.enabled] = isOn ? "true" : "false"
+            }
+            return cell
+        case .key:
+            let cell: TunnelEditEditableKeyValueCell = tableView.dequeueReusableCell(for: indexPath)
+            cell.key = field.localizedUIString
+            cell.value = tunnelViewModel.obfuscatorData[.key]
+            cell.placeholderText = tr("tunnelEditPlaceholderTextOptional")
+            cell.keyboardType = .default
+            cell.onValueChanged = { [weak self] _, value in
+                self?.tunnelViewModel.obfuscatorData[.key] = value
+            }
+            return cell
+        case .maskingType:
+            let cell: TunnelEditKeyValueCell = tableView.dequeueReusableCell(for: indexPath)
+            cell.key = field.localizedUIString
+            let maskingType = tunnelViewModel.obfuscatorData[.maskingType]
+            cell.value = maskingType.isEmpty ? tr("tunnelObfuscatorMaskingNone") : maskingType
+            return cell
+        case .maxDummyLength:
+            let cell: TunnelEditEditableKeyValueCell = tableView.dequeueReusableCell(for: indexPath)
+            cell.key = field.localizedUIString
+            cell.value = tunnelViewModel.obfuscatorData[.maxDummyLength]
+            cell.placeholderText = "4"
+            cell.keyboardType = .numberPad
+            cell.onValueChanged = { [weak self] _, value in
+                self?.tunnelViewModel.obfuscatorData[.maxDummyLength] = value
+            }
             return cell
         }
     }
