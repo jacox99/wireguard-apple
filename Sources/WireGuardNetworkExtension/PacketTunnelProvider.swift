@@ -62,6 +62,26 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
                 completionHandler(PacketTunnelProviderError.couldNotStartBackend)
 
+            case .noSuchTunnel:
+                wg_log(.error, staticMessage: "Starting tunnel failed: no such tunnel")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
+            case .noTunnelVirtualInterface:
+                wg_log(.error, staticMessage: "Starting tunnel failed: no tunnel virtual interface")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
+            case .icmpSocketNotOpen:
+                wg_log(.error, staticMessage: "Starting tunnel failed: ICMP socket not open")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
+            case .internalError(let errorCode):
+                wg_log(.error, message: "Starting tunnel failed with internal error: \(errorCode)")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
             case .invalidState:
                 // Must never happen
                 fatalError()

@@ -52,3 +52,6 @@ Sources/WireGuardApp/Config/Developer.xcconfig
 
 # Visual Studio Code
 *.vscode
+
+# oh-my-claude-code
+.omc/

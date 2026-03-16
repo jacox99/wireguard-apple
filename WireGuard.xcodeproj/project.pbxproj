@@ -59,6 +59,8 @@
 		5892BFA125558288000E678D /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5892BF9F25558288000E678D /* PacketTunnelProvider.swift */; };
 		58BA78D52577F9C6006FAEA0 /* libwg-go.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 58DB6CD52577F95D00FB6B73 /* libwg-go.a */; };
 		58DB6CD62577F95D00FB6B73 /* libwg-go.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 58DB6CD52577F95D00FB6B73 /* libwg-go.a */; };
+		6FB1BEE01A1A1A1A00A991BF /* libmaybenot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FB1BEDF1A1A1A1A00A991BF /* libmaybenot.a */; };
+		6FB1BEE11A1A1A1A00A991BF /* libmaybenot.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FB1BEDF1A1A1A1A00A991BF /* libmaybenot.a */; };
 		5F45417D21C1B23600994C13 /* UITableViewCell+Reuse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F45417C21C1B23600994C13 /* UITableViewCell+Reuse.swift */; };
 		5F45418C21C2D48200994C13 /* TunnelEditKeyValueCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F45418B21C2D48200994C13 /* TunnelEditKeyValueCell.swift */; };
 		5F45419021C2D53800994C13 /* SwitchCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F45418F21C2D53800994C13 /* SwitchCell.swift */; };
@@ -302,6 +304,7 @@
 		585B10592577E293004F691E /* x25519.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = x25519.h; sourceTree = "<group>"; };
 		5892BF9F25558288000E678D /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
 		58DB6CD52577F95D00FB6B73 /* libwg-go.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libwg-go.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6FB1BEDF1A1A1A1A00A991BF /* libmaybenot.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libmaybenot.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F45417C21C1B23600994C13 /* UITableViewCell+Reuse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITableViewCell+Reuse.swift"; sourceTree = "<group>"; };
 		5F45418B21C2D48200994C13 /* TunnelEditKeyValueCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelEditKeyValueCell.swift; sourceTree = "<group>"; };
 		5F45418F21C2D53800994C13 /* SwitchCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitchCell.swift; sourceTree = "<group>"; };
@@ -449,6 +452,7 @@
 			files = (
 				6B5CA6B1220DE4E900F126CF /* NetworkExtension.framework in Frameworks */,
 				58BA78D52577F9C6006FAEA0 /* libwg-go.a in Frameworks */,
+				6FB1BEE01A1A1A1A00A991BF /* libmaybenot.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -466,6 +470,7 @@
 			files = (
 				6B5CA6B2220DE4F400F126CF /* NetworkExtension.framework in Frameworks */,
 				58DB6CD62577F95D00FB6B73 /* libwg-go.a in Frameworks */,
+				6FB1BEE11A1A1A1A00A991BF /* libmaybenot.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -816,6 +821,7 @@
 			isa = PBXGroup;
 			children = (
 				58DB6CD52577F95D00FB6B73 /* libwg-go.a */,
+				6FB1BEDF1A1A1A1A00A991BF /* libmaybenot.a */,
 				6FB1BDB621D4F8B800A991BF /* NetworkExtension.framework */,
 				6FF4AC462120B9E0002C96EB /* NetworkExtension.framework */,
 			);

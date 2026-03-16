@@ -11,7 +11,9 @@ CONFIGURATION_TEMP_DIR ?= $(CURDIR)/.tmp
 
 BUILT_PRODUCTS_DIR ?= $(CURDIR)
 
-export PATH := $(PATH):/usr/local/bin:/opt/homebrew/bin
+# PATH for both $(shell) calls and recipes
+NEW_PATH := $(PATH):/usr/local/bin:/opt/homebrew/bin
+export PATH := $(NEW_PATH)
 export CC ?= clang
 LIPO ?= lipo
 DESTDIR ?= $(CONFIGURATION_BUILD_DIR)
@@ -37,7 +39,7 @@ endif
 build: $(DESTDIR)/libwg-go.a
 version-header: $(DESTDIR)/wireguard-go-version.h
 
-REAL_GOROOT := $(shell go env GOROOT 2>/dev/null)
+REAL_GOROOT := $(shell PATH="$(NEW_PATH)" go env GOROOT 2>/dev/null)
 export GOROOT := $(BUILDDIR)/goroot
 $(GOROOT)/.prepared:
 	[ -n "$(REAL_GOROOT)" ]
