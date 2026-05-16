@@ -1,12 +1,12 @@
-# wg-obfuscator Integration Implementation Plan
+# wg-obfuscator Bind Integration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add iOS and macOS client-side wg-obfuscator compatibility by running an embedded UDP obfuscation forwarder inside the Network Extension and rewriting WireGuard runtime endpoints to loopback.
+**Goal:** Add iOS and macOS client-side wg-obfuscator compatibility by wrapping `wireguard-go`'s UDP `conn.Bind` with an obfuscating bind.
 
-**Architecture:** The Network Extension starts one embedded `ObfuscationSession` before starting `wireguard-go`. `PacketTunnelSettingsGenerator` adds an excluded `/32` route for the real obfuscator server IPv4 and rewrites the WireGuard UAPI endpoint to `127.0.0.1:<localPort>`, preventing utun self-capture loops.
+**Architecture:** Swift persists and validates obfuscation metadata, then passes a C-compatible config to the Go bridge. The Go bridge wraps `conn.NewStdNetBind()` with `obfuscator.Bind` for single-hop and for the physical entry leg of multihop; peer endpoints stay real and are not rewritten to loopback.
 
-**Tech Stack:** Swift 5.5, Network.framework, NetworkExtension, XCTest, Swift Package Manager, existing WireGuardKit and WireGuardKitGo bridge.
+**Tech Stack:** Swift 5.5, NetworkExtension, XCTest, Go 1.21, wireguard-go `conn.Bind`, CGO C bridge, Swift Package Manager, Xcode project.
 
 ---
 
@@ -14,62 +14,66 @@
 
 Implement from `docs/superpowers/specs/2026-05-16-wg-obfuscator-design.md`.
 
-Do not copy upstream `ClusterM/wg-obfuscator` GPL-3.0 source into this repository unless the product owner explicitly approves GPL-compatible distribution or obtains a separate license. This plan uses a clean-room codec boundary and an external compatibility harness.
+Do not copy upstream `ClusterM/wg-obfuscator` GPL-3.0 source into this repository unless the product owner explicitly approves GPL-compatible distribution or obtains a separate license. This plan assumes clean-room codec implementation and black-box compatibility tests against an externally built upstream binary.
 
 ## Scope
 
-This plan implements the first production slice:
+This plan implements:
 
-- One obfuscated peer per tunnel.
-- IPv4 real obfuscator endpoints only.
-- Obfuscation metadata stored outside wg-quick text.
-- Embedded session in-process inside the packet tunnel provider.
-- Route exclusion for the real obfuscator endpoint before outer UDP traffic starts.
-- Codec boundary plus compatibility tests against an external upstream binary.
+- One physical obfuscated transport per tunnel.
+- Single-hop obfuscation by wrapping the device's `conn.NewStdNetBind()`.
+- Multihop physical entry-leg obfuscation by wrapping the entry device's `conn.NewStdNetBind()`.
+- No Swift UDP forwarding session.
+- No endpoint rewrite to `127.0.0.1`.
+- Optional `/32` excluded route hardening for the real obfuscator server IPv4.
 
-This plan does not implement UI controls. Tests and programmatic configuration paths come first.
+This plan does not implement UI controls or custom wg-quick import/export keys.
 
 ## File Structure
 
 Create:
 
 - `Sources/WireGuardKitTypes/ObfuscationConfiguration.swift`
-  - Public value types for persisted obfuscation configuration.
-- `Sources/WireGuardKit/ObfuscationRuntime.swift`
-  - Internal runtime endpoint override and excluded route models.
-- `Sources/WireGuardKitObfuscator/ObfuscationCodec.swift`
-  - Codec protocol and clean-room codec entry point.
-- `Sources/WireGuardKitObfuscator/ObfuscationSession.swift`
-  - Session protocol and Network.framework UDP forwarder.
-- `Sources/WireGuardKitObfuscator/ObfuscationSessionFactory.swift`
-  - Factory used by `WireGuardAdapter`.
+  - Public Swift value types for persisted obfuscation metadata.
+- `Sources/WireGuardKit/ObfuscationRouteExclusion.swift`
+  - Internal Swift helper that validates the physical obfuscator endpoint and creates excluded routes.
+- `Sources/WireGuardKitGo/obfuscator/config.go`
+  - Go config types and validation.
+- `Sources/WireGuardKitGo/obfuscator/codec.go`
+  - Clean-room codec interface and initial implementation boundary.
+- `Sources/WireGuardKitGo/obfuscator/bind.go`
+  - `conn.Bind` wrapper.
+- `Sources/WireGuardKitGo/obfuscator/bind_test.go`
+  - Bind behavior tests with a fake base bind and fake codec.
+- `Sources/WireGuardKitGo/obfuscator/config_test.go`
+  - Config validation tests.
 - `Tests/WireGuardKitTypesTests/ObfuscationConfigurationTests.swift`
-  - Configuration validation tests.
-- `Tests/WireGuardKitTests/PacketTunnelSettingsGeneratorObfuscationTests.swift`
-  - Endpoint override and route exclusion tests.
-- `Tests/WireGuardKitObfuscatorTests/ObfuscationSessionTests.swift`
-  - Local UDP forwarding tests using a fake codec.
-- `Tests/WireGuardKitObfuscatorCompatibilityTests/ExternalWgObfuscatorCompatibilityTests.swift`
-  - Optional external binary compatibility tests, enabled by `WG_OBFUSCATOR_BIN`.
+  - Swift model validation tests.
+- `Tests/WireGuardKitTests/ObfuscationRouteExclusionTests.swift`
+  - Route hardening and no-endpoint-rewrite tests.
 
 Modify:
 
 - `Package.swift`
-  - Add `WireGuardKitObfuscator` target and test targets.
+  - Add `WireGuardKitTypesTests` and `WireGuardKitTests` test targets.
 - `Sources/WireGuardKitTypes/TunnelConfiguration.swift`
-  - Add optional `obfuscation` property to `TunnelConfiguration`.
+  - Add optional `obfuscation` property.
 - `Sources/Shared/Model/NETunnelProviderProtocol+Extension.swift`
   - Persist and restore obfuscation metadata in `providerConfiguration`.
 - `Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift`
-  - Accept endpoint overrides and excluded IPv4 routes.
+  - Accept optional obfuscation excluded IPv4 routes. Do not rewrite endpoints.
 - `Sources/WireGuardKit/WireGuardAdapter.swift`
-  - Start/stop obfuscation sessions, pass endpoint overrides to settings generation, and clean up on errors.
+  - Validate obfuscation, pass C bridge config, and add route hardening before backend start.
 - `Sources/WireGuardNetworkExtension/PacketTunnelProvider.swift`
   - Surface new adapter errors.
+- `Sources/WireGuardKitGo/wireguard.h`
+  - Add C bridge structs and updated function signatures.
+- `Sources/WireGuardKitGo/api-apple.go`
+  - Convert C bridge config and wrap binds.
 - `WireGuard.xcodeproj/project.pbxproj`
-  - Add the new Swift files to the build phases listed in Task 8.
+  - Add new Swift files to existing targets.
 
-## Task 1: Add Obfuscation Configuration Types
+## Task 1: Add Swift Obfuscation Configuration Types
 
 **Files:**
 - Modify: `Package.swift`
@@ -77,7 +81,7 @@ Modify:
 - Create: `Sources/WireGuardKitTypes/ObfuscationConfiguration.swift`
 - Create: `Tests/WireGuardKitTypesTests/ObfuscationConfigurationTests.swift`
 
-- [ ] **Step 1: Add failing configuration tests**
+- [ ] **Step 1: Write failing Swift model tests**
 
 Create `Tests/WireGuardKitTypesTests/ObfuscationConfigurationTests.swift`:
 
@@ -87,88 +91,61 @@ import XCTest
 
 final class ObfuscationConfigurationTests: XCTestCase {
     func testValidPeerConfigurationAcceptsSupportedModes() throws {
-        let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
+        let publicKey = PublicKey(rawValue: Data(repeating: 1, count: 32))!
 
-        let stun = try PeerObfuscationConfiguration(
-            peerPublicKey: publicKey,
-            key: "shared-secret",
-            masking: .stun,
-            maxDummyBytes: 4
-        )
-        let auto = try PeerObfuscationConfiguration(
-            peerPublicKey: publicKey,
-            key: "shared-secret",
-            masking: .auto,
-            maxDummyBytes: 4
-        )
-        let none = try PeerObfuscationConfiguration(
-            peerPublicKey: publicKey,
-            key: "shared-secret",
-            masking: .none,
-            maxDummyBytes: 4
-        )
+        let stun = try PeerObfuscationConfiguration(peerPublicKey: publicKey, key: "shared-secret", masking: .stun)
+        let auto = try PeerObfuscationConfiguration(peerPublicKey: publicKey, key: "shared-secret", masking: .auto)
+        let none = try PeerObfuscationConfiguration(peerPublicKey: publicKey, key: "shared-secret", masking: .none)
 
         XCTAssertEqual(stun.masking, .stun)
         XCTAssertEqual(auto.masking, .auto)
         XCTAssertEqual(none.masking, .none)
+        XCTAssertEqual(stun.transportLeg, .physical)
     }
 
     func testRejectsEmptyKey() throws {
-        let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
+        let publicKey = PublicKey(rawValue: Data(repeating: 1, count: 32))!
 
-        XCTAssertThrowsError(try PeerObfuscationConfiguration(
-            peerPublicKey: publicKey,
-            key: "",
-            masking: .auto,
-            maxDummyBytes: 4
-        )) { error in
+        XCTAssertThrowsError(try PeerObfuscationConfiguration(peerPublicKey: publicKey, key: "", masking: .auto)) { error in
             XCTAssertEqual(error as? ObfuscationConfigurationError, .invalidKeyLength)
         }
     }
 
     func testRejectsKeyLongerThan255Utf8Bytes() throws {
-        let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
+        let publicKey = PublicKey(rawValue: Data(repeating: 1, count: 32))!
         let longKey = String(repeating: "a", count: 256)
 
-        XCTAssertThrowsError(try PeerObfuscationConfiguration(
-            peerPublicKey: publicKey,
-            key: longKey,
-            masking: .auto,
-            maxDummyBytes: 4
-        )) { error in
+        XCTAssertThrowsError(try PeerObfuscationConfiguration(peerPublicKey: publicKey, key: longKey, masking: .auto)) { error in
             XCTAssertEqual(error as? ObfuscationConfigurationError, .invalidKeyLength)
         }
     }
 
-    func testLookupByPeerPublicKey() throws {
-        let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
-        let peer = try PeerObfuscationConfiguration(
-            peerPublicKey: publicKey,
-            key: "shared-secret",
-            masking: .stun,
-            maxDummyBytes: 4
-        )
-        let configuration = ObfuscationConfiguration(peers: [peer])
+    func testValidatedForPhysicalTransportRejectsMultiplePeers() throws {
+        let publicKeyA = PublicKey(rawValue: Data(repeating: 1, count: 32))!
+        let publicKeyB = PublicKey(rawValue: Data(repeating: 2, count: 32))!
+        let peerA = try PeerObfuscationConfiguration(peerPublicKey: publicKeyA, key: "shared-secret", masking: .stun)
+        let peerB = try PeerObfuscationConfiguration(peerPublicKey: publicKeyB, key: "shared-secret", masking: .stun)
+        let configuration = ObfuscationConfiguration(peers: [peerA, peerB])
 
-        XCTAssertEqual(configuration.configuration(for: publicKey), peer)
+        XCTAssertThrowsError(try configuration.validatedForSinglePhysicalTransport()) { error in
+            XCTAssertEqual(error as? ObfuscationConfigurationError, .multiplePhysicalTransports)
+        }
     }
 }
 ```
 
-- [ ] **Step 2: Add test target to Package.swift**
+- [ ] **Step 2: Add Swift test target**
 
-Modify `Package.swift` test targets:
+Modify `Package.swift` by adding:
 
 ```swift
 .testTarget(
     name: "WireGuardKitTypesTests",
     dependencies: ["WireGuardKitTypes"]
-)
+),
 ```
 
-Place it after the existing targets array entries and keep the trailing comma style valid.
-
-- [ ] **Step 3: Run the tests to verify they fail**
+- [ ] **Step 3: Run the tests to confirm failure**
 
 Run:
 
@@ -176,9 +153,9 @@ Run:
 swift test --filter ObfuscationConfigurationTests
 ```
 
-Expected: FAIL because `PeerObfuscationConfiguration`, `ObfuscationConfiguration`, and `ObfuscationConfigurationError` do not exist.
+Expected: FAIL because the obfuscation Swift types do not exist.
 
-- [ ] **Step 4: Add configuration implementation**
+- [ ] **Step 4: Implement Swift model types**
 
 Create `Sources/WireGuardKitTypes/ObfuscationConfiguration.swift`:
 
@@ -194,10 +171,15 @@ public enum ObfuscationMasking: String, Codable, Equatable, CaseIterable {
     case none = "NONE"
 }
 
+public enum ObfuscationTransportLeg: String, Codable, Equatable {
+    case physical = "physical"
+}
+
 public enum ObfuscationConfigurationError: Error, Equatable {
     case invalidKeyLength
     case invalidMaxDummyBytes
     case duplicatePeer(PublicKey)
+    case multiplePhysicalTransports
 }
 
 public struct PeerObfuscationConfiguration: Codable, Equatable, Hashable {
@@ -205,8 +187,9 @@ public struct PeerObfuscationConfiguration: Codable, Equatable, Hashable {
     public let key: String
     public let masking: ObfuscationMasking
     public let maxDummyBytes: UInt16
+    public let transportLeg: ObfuscationTransportLeg
 
-    public init(peerPublicKey: PublicKey, key: String, masking: ObfuscationMasking, maxDummyBytes: UInt16 = 4) throws {
+    public init(peerPublicKey: PublicKey, key: String, masking: ObfuscationMasking, maxDummyBytes: UInt16 = 4, transportLeg: ObfuscationTransportLeg = .physical) throws {
         let keyLength = key.lengthOfBytes(using: .utf8)
         guard (1...255).contains(keyLength) else {
             throw ObfuscationConfigurationError.invalidKeyLength
@@ -219,6 +202,7 @@ public struct PeerObfuscationConfiguration: Codable, Equatable, Hashable {
         self.key = key
         self.masking = masking
         self.maxDummyBytes = maxDummyBytes
+        self.transportLeg = transportLeg
     }
 }
 
@@ -229,18 +213,22 @@ public struct ObfuscationConfiguration: Codable, Equatable, Hashable {
         self.peers = peers
     }
 
-    public func validatedForSinglePeer() throws -> ObfuscationConfiguration {
+    public func configuration(for publicKey: PublicKey) -> PeerObfuscationConfiguration? {
+        peers.first { $0.peerPublicKey == publicKey }
+    }
+
+    public func validatedForSinglePhysicalTransport() throws -> ObfuscationConfiguration {
         var seen = Set<PublicKey>()
+        let physicalPeers = peers.filter { $0.transportLeg == .physical }
+        guard physicalPeers.count <= 1 else {
+            throw ObfuscationConfigurationError.multiplePhysicalTransports
+        }
         for peer in peers {
             guard seen.insert(peer.peerPublicKey).inserted else {
                 throw ObfuscationConfigurationError.duplicatePeer(peer.peerPublicKey)
             }
         }
         return self
-    }
-
-    public func configuration(for publicKey: PublicKey) -> PeerObfuscationConfiguration? {
-        peers.first { $0.peerPublicKey == publicKey }
     }
 }
 ```
@@ -271,7 +259,7 @@ public final class TunnelConfiguration {
 }
 ```
 
-Update `TunnelConfiguration ==` to include obfuscation:
+Update equality:
 
 ```swift
 return lhs.name == rhs.name &&
@@ -299,13 +287,14 @@ git add Package.swift Sources/WireGuardKitTypes/TunnelConfiguration.swift Source
 git commit -m "feat: add obfuscation configuration model"
 ```
 
-## Task 2: Persist Obfuscation Metadata in Provider Configuration
+## Task 2: Persist Obfuscation Metadata Outside wg-quick
 
 **Files:**
+- Modify: `Sources/WireGuardKitTypes/ObfuscationConfiguration.swift`
 - Modify: `Sources/Shared/Model/NETunnelProviderProtocol+Extension.swift`
 - Create: `Tests/WireGuardKitTypesTests/ObfuscationProviderCodingTests.swift`
 
-- [ ] **Step 1: Add failing property-list round-trip tests**
+- [ ] **Step 1: Write failing provider coding tests**
 
 Create `Tests/WireGuardKitTypesTests/ObfuscationProviderCodingTests.swift`:
 
@@ -314,14 +303,9 @@ import XCTest
 @testable import WireGuardKitTypes
 
 final class ObfuscationProviderCodingTests: XCTestCase {
-    func testPropertyListDictionaryRoundTrip() throws {
-        let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
-        let peer = try PeerObfuscationConfiguration(
-            peerPublicKey: publicKey,
-            key: "shared-secret",
-            masking: .stun,
-            maxDummyBytes: 8
-        )
+    func testProviderDictionaryRoundTrip() throws {
+        let publicKey = PublicKey(rawValue: Data(repeating: 1, count: 32))!
+        let peer = try PeerObfuscationConfiguration(peerPublicKey: publicKey, key: "shared-secret", masking: .stun, maxDummyBytes: 8)
         let configuration = ObfuscationConfiguration(peers: [peer])
 
         let dictionary = try configuration.asProviderConfigurationDictionary()
@@ -330,13 +314,13 @@ final class ObfuscationProviderCodingTests: XCTestCase {
         XCTAssertEqual(decoded, configuration)
     }
 
-    func testRejectsMalformedPropertyListDictionary() throws {
+    func testRejectsMalformedDictionary() throws {
         XCTAssertThrowsError(try ObfuscationConfiguration(providerConfigurationDictionary: ["peers": "wrong"]))
     }
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run test to confirm failure**
 
 Run:
 
@@ -346,9 +330,9 @@ swift test --filter ObfuscationProviderCodingTests
 
 Expected: FAIL because provider dictionary helpers do not exist.
 
-- [ ] **Step 3: Add provider dictionary helpers**
+- [ ] **Step 3: Implement provider dictionary helpers**
 
-Add to `Sources/WireGuardKitTypes/ObfuscationConfiguration.swift`:
+Append to `Sources/WireGuardKitTypes/ObfuscationConfiguration.swift`:
 
 ```swift
 public enum ObfuscationProviderCodingError: Error, Equatable {
@@ -378,18 +362,19 @@ extension ObfuscationConfiguration {
 }
 ```
 
-- [ ] **Step 4: Thread persistence through NETunnelProviderProtocol**
+- [ ] **Step 4: Persist metadata in provider configuration**
 
-Modify `Sources/Shared/Model/NETunnelProviderProtocol+Extension.swift` so `providerConfiguration` preserves both macOS `UID` and obfuscation:
+Modify `Sources/Shared/Model/NETunnelProviderProtocol+Extension.swift` by adding:
 
 ```swift
 private enum ProviderConfigurationKey {
     static let uid = "UID"
     static let obfuscation = "Obfuscation"
+    static let wgQuickConfig = "WgQuickConfig"
 }
 ```
 
-In `init?(tunnelConfiguration:previouslyFrom:)`, replace direct `providerConfiguration = ["UID": getuid()]` with:
+In `init?(tunnelConfiguration:previouslyFrom:)`, replace direct provider configuration assignment with:
 
 ```swift
 var providerConfig = [String: Any]()
@@ -403,18 +388,34 @@ if let obfuscation = tunnelConfiguration.obfuscation,
 providerConfiguration = providerConfig.isEmpty ? nil : providerConfig
 ```
 
-In `asTunnelConfiguration(called:)`, after parsing wg-quick:
+In `asTunnelConfiguration(called:)`, restore obfuscation after parsing the wg-quick text:
+
+```swift
+private func applyObfuscationProviderConfiguration(to tunnelConfiguration: TunnelConfiguration?) -> TunnelConfiguration? {
+    guard let tunnelConfiguration else { return nil }
+    if let dictionary = providerConfiguration?[ProviderConfigurationKey.obfuscation] as? [String: Any],
+       let obfuscation = try? ObfuscationConfiguration(providerConfigurationDictionary: dictionary) {
+        tunnelConfiguration.obfuscation = obfuscation
+    }
+    return tunnelConfiguration
+}
+```
+
+Use it in both branches:
 
 ```swift
 let tunnelConfiguration = try? TunnelConfiguration(fromWgQuickConfig: config, called: name)
-if let obfuscationDictionary = providerConfiguration?[ProviderConfigurationKey.obfuscation] as? [String: Any],
-   let obfuscation = try? ObfuscationConfiguration(providerConfigurationDictionary: obfuscationDictionary) {
-    tunnelConfiguration?.obfuscation = obfuscation
-}
-return tunnelConfiguration
+return applyObfuscationProviderConfiguration(to: tunnelConfiguration)
 ```
 
-Apply the same obfuscation restoration to the `oldConfig` fallback branch.
+and:
+
+```swift
+if let oldConfig = providerConfiguration?[ProviderConfigurationKey.wgQuickConfig] as? String {
+    let tunnelConfiguration = try? TunnelConfiguration(fromWgQuickConfig: oldConfig, called: name)
+    return applyObfuscationProviderConfiguration(to: tunnelConfiguration)
+}
+```
 
 - [ ] **Step 5: Run tests**
 
@@ -435,61 +436,35 @@ git add Sources/WireGuardKitTypes/ObfuscationConfiguration.swift Sources/Shared/
 git commit -m "feat: persist obfuscation provider metadata"
 ```
 
-## Task 3: Add Endpoint Overrides and Route Exclusions
+## Task 3: Add Route Hardening Without Endpoint Rewrite
 
 **Files:**
-- Create: `Sources/WireGuardKit/ObfuscationRuntime.swift`
+- Create: `Sources/WireGuardKit/ObfuscationRouteExclusion.swift`
 - Modify: `Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift`
-- Create: `Tests/WireGuardKitTests/PacketTunnelSettingsGeneratorObfuscationTests.swift`
+- Create: `Tests/WireGuardKitTests/ObfuscationRouteExclusionTests.swift`
 
-- [ ] **Step 1: Add failing generator tests**
+- [ ] **Step 1: Write failing route and UAPI tests**
 
-Create `Tests/WireGuardKitTests/PacketTunnelSettingsGeneratorObfuscationTests.swift`:
+Create `Tests/WireGuardKitTests/ObfuscationRouteExclusionTests.swift`:
 
 ```swift
 import XCTest
-import Network
 import NetworkExtension
 @testable import WireGuardKit
 @testable import WireGuardKitTypes
 
-final class PacketTunnelSettingsGeneratorObfuscationTests: XCTestCase {
-    func testUapiUsesLoopbackEndpointForObfuscatedPeer() throws {
-        let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
-        let privateKey = PrivateKey(base64Key: "mIhH5n9U7N3E5wEHVY+ExnJ+X5k7c9yXWmM6p1sQDXA=")!
-        var interface = InterfaceConfiguration(privateKey: privateKey)
-        interface.addresses = [IPAddressRange(from: "10.0.0.2/32")!]
+final class ObfuscationRouteExclusionTests: XCTestCase {
+    func testExcludedRouteUsesRealEndpointIPv4() throws {
+        let endpoint = Endpoint(from: "198.51.100.10:19999")!
+        let route = try ObfuscationRouteExclusion.excludedIPv4Route(for: endpoint)
 
-        var peer = PeerConfiguration(publicKey: publicKey)
-        peer.endpoint = Endpoint(from: "198.51.100.10:19999")
-        peer.allowedIPs = [IPAddressRange(from: "0.0.0.0/0")!]
-
-        let tunnel = TunnelConfiguration(name: "obfs", interface: interface, peers: [peer])
-        let resolvedEndpoint = Endpoint(from: "198.51.100.10:19999")!
-        let loopbackEndpoint = Endpoint(from: "127.0.0.1:40000")!
-        let runtime = ObfuscationRuntime(
-            endpointOverrides: [publicKey: loopbackEndpoint],
-            excludedIPv4Addresses: [IPv4Address("198.51.100.10")!]
-        )
-
-        let generator = PacketTunnelSettingsGenerator(
-            exit: DeviceConfiguration(
-                configuration: tunnel,
-                resolvedEndpoints: [resolvedEndpoint],
-                reResolveEndpoint: false
-            ),
-            obfuscationRuntime: runtime
-        )
-
-        let (uapi, _) = generator.uapiConfiguration()
-
-        XCTAssertTrue(uapi.contains("endpoint=127.0.0.1:40000"))
-        XCTAssertFalse(uapi.contains("endpoint=198.51.100.10:19999"))
+        XCTAssertEqual(route.destinationAddress, "198.51.100.10")
+        XCTAssertEqual(route.destinationSubnetMask, "255.255.255.255")
     }
 
-    func testNetworkSettingsExcludeRealObfuscatorIPv4() throws {
-        let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
-        let privateKey = PrivateKey(base64Key: "mIhH5n9U7N3E5wEHVY+ExnJ+X5k7c9yXWmM6p1sQDXA=")!
+    func testUapiKeepsRealEndpointWhenObfuscationRouteExists() throws {
+        let publicKey = PublicKey(rawValue: Data(repeating: 1, count: 32))!
+        let privateKey = PrivateKey(rawValue: Data(repeating: 3, count: 32))!
         var interface = InterfaceConfiguration(privateKey: privateKey)
         interface.addresses = [IPAddressRange(from: "10.0.0.2/32")!]
 
@@ -498,31 +473,26 @@ final class PacketTunnelSettingsGeneratorObfuscationTests: XCTestCase {
         peer.allowedIPs = [IPAddressRange(from: "0.0.0.0/0")!]
 
         let tunnel = TunnelConfiguration(name: "obfs", interface: interface, peers: [peer])
-        let runtime = ObfuscationRuntime(
-            endpointOverrides: [:],
-            excludedIPv4Addresses: [IPv4Address("198.51.100.10")!]
-        )
         let generator = PacketTunnelSettingsGenerator(
             exit: DeviceConfiguration(
                 configuration: tunnel,
                 resolvedEndpoints: [peer.endpoint],
-                reResolveEndpoint: false
-            ),
-            obfuscationRuntime: runtime
+                reResolveEndpoint: false,
+                obfuscationExcludedRoutes: [try ObfuscationRouteExclusion.excludedIPv4Route(for: peer.endpoint!)]
+            )
         )
 
-        let settings = generator.generateNetworkSettings()
-        let excluded = settings.ipv4Settings?.excludedRoutes ?? []
+        let (uapi, _) = generator.uapiConfiguration()
 
-        XCTAssertEqual(excluded.map(\.destinationAddress), ["198.51.100.10"])
-        XCTAssertEqual(excluded.map(\.destinationSubnetMask), ["255.255.255.255"])
+        XCTAssertTrue(uapi.contains("endpoint=198.51.100.10:19999"))
+        XCTAssertFalse(uapi.contains("127.0.0.1"))
     }
 }
 ```
 
-- [ ] **Step 2: Add test target to Package.swift**
+- [ ] **Step 2: Add Swift test target**
 
-Add:
+Modify `Package.swift` by adding:
 
 ```swift
 .testTarget(
@@ -531,126 +501,80 @@ Add:
 ),
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [ ] **Step 3: Run tests to confirm failure**
 
 Run:
 
 ```bash
-swift test --filter PacketTunnelSettingsGeneratorObfuscationTests
+swift test --filter ObfuscationRouteExclusionTests
 ```
 
-Expected: FAIL because `ObfuscationRuntime` and `PacketTunnelSettingsGenerator(..., obfuscationRuntime:)` do not exist.
+Expected: FAIL because `ObfuscationRouteExclusion` and `obfuscationExcludedRoutes` do not exist.
 
-- [ ] **Step 4: Add runtime model**
+- [ ] **Step 4: Implement route helper**
 
-Create `Sources/WireGuardKit/ObfuscationRuntime.swift`:
+Create `Sources/WireGuardKit/ObfuscationRouteExclusion.swift`:
 
 ```swift
 // SPDX-License-Identifier: MIT
 // Copyright © 2026 WireGuard LLC. All Rights Reserved.
 
-import Foundation
 import NetworkExtension
 
 #if SWIFT_PACKAGE
 import WireGuardKitTypes
 #endif
 
-struct ObfuscationRuntime {
-    let endpointOverrides: [PublicKey: Endpoint]
-    let excludedIPv4Addresses: [IPv4Address]
+enum ObfuscationRouteExclusionError: Error, Equatable {
+    case endpointIsNotIPv4
+}
 
-    static let empty = ObfuscationRuntime(endpointOverrides: [:], excludedIPv4Addresses: [])
-
-    func endpointOverride(for publicKey: PublicKey) -> Endpoint? {
-        endpointOverrides[publicKey]
-    }
-
-    func excludedIPv4Routes() -> [NEIPv4Route] {
-        excludedIPv4Addresses.map {
-            NEIPv4Route(destinationAddress: "\($0)", subnetMask: "255.255.255.255")
+enum ObfuscationRouteExclusion {
+    static func excludedIPv4Route(for endpoint: Endpoint) throws -> NEIPv4Route {
+        guard case .ipv4(let address) = endpoint.host else {
+            throw ObfuscationRouteExclusionError.endpointIsNotIPv4
         }
+        return NEIPv4Route(destinationAddress: "\(address)", subnetMask: "255.255.255.255")
     }
 }
 ```
 
-- [ ] **Step 5: Modify settings generator**
+- [ ] **Step 5: Add excluded routes to settings generator**
 
-In `Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift`, add `obfuscationRuntime` to `DeviceConfiguration`:
+Modify `Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift`:
 
 ```swift
 struct DeviceConfiguration {
     let configuration: TunnelConfiguration
     let resolvedEndpoints: [Endpoint?]
     let reResolveEndpoint: Bool
-    let obfuscationRuntime: ObfuscationRuntime
-```
+    let obfuscationExcludedRoutes: [NEIPv4Route]
 
-Add a defaulted initializer if needed:
-
-```swift
-init(configuration: TunnelConfiguration, resolvedEndpoints: [Endpoint?], reResolveEndpoint: Bool, obfuscationRuntime: ObfuscationRuntime = .empty) {
-    self.configuration = configuration
-    self.resolvedEndpoints = resolvedEndpoints
-    self.reResolveEndpoint = reResolveEndpoint
-    self.obfuscationRuntime = obfuscationRuntime
+    init(configuration: TunnelConfiguration, resolvedEndpoints: [Endpoint?], reResolveEndpoint: Bool, obfuscationExcludedRoutes: [NEIPv4Route] = []) {
+        self.configuration = configuration
+        self.resolvedEndpoints = resolvedEndpoints
+        self.reResolveEndpoint = reResolveEndpoint
+        self.obfuscationExcludedRoutes = obfuscationExcludedRoutes
+    }
 }
 ```
 
 After `ipv4Settings.includedRoutes = ipv4IncludedRoutes`, add:
 
 ```swift
-let excludedRoutes = obfuscationRuntime.excludedIPv4Routes()
-if !excludedRoutes.isEmpty {
-    ipv4Settings.excludedRoutes = excludedRoutes
+if !obfuscationExcludedRoutes.isEmpty {
+    ipv4Settings.excludedRoutes = obfuscationExcludedRoutes
 }
 ```
 
-In both `endpointUapiConfiguration()` and `uapiConfiguration(for:)`, before writing a resolved endpoint, prefer override:
-
-```swift
-if let override = device.obfuscationRuntime.endpointOverride(for: peer.publicKey) {
-    wgSettings.append("endpoint=\(override.stringRepresentation)\n")
-} else if device.reResolveEndpoint {
-    let result = resolvedEndpoint.map(Self.reresolveEndpoint)
-    if case .success((_, let resolvedEndpoint)) = result {
-        if case .name = resolvedEndpoint.host { assert(false, "Endpoint is not resolved") }
-        wgSettings.append("endpoint=\(resolvedEndpoint.stringRepresentation)\n")
-    }
-    resolutionResults.append(result)
-} else {
-    resolvedEndpoint.map {
-        wgSettings.append("endpoint=\($0.stringRepresentation)\n")
-    }
-}
-```
-
-Add `obfuscationRuntime` to `PacketTunnelSettingsGenerator`:
-
-```swift
-class PacketTunnelSettingsGenerator {
-    let exit: DeviceConfiguration
-    let entry: DeviceConfiguration?
-    let daita: DaitaConfiguration?
-    let obfuscationRuntime: ObfuscationRuntime
-
-    init(exit: DeviceConfiguration, entry: DeviceConfiguration? = nil, daita: DaitaConfiguration? = nil, obfuscationRuntime: ObfuscationRuntime = .empty) {
-        self.exit = exit
-        self.entry = entry
-        self.daita = daita
-        self.obfuscationRuntime = obfuscationRuntime
-    }
-}
-```
-
-Pass the runtime into the exit `DeviceConfiguration` before generator creation.
+Do not change the endpoint-writing logic in `uapiConfiguration(for:)` or `endpointUapiConfiguration()`.
 
 - [ ] **Step 6: Run tests**
 
 Run:
 
 ```bash
-swift test --filter PacketTunnelSettingsGeneratorObfuscationTests
+swift test --filter ObfuscationRouteExclusionTests
 ```
 
 Expected: PASS.
@@ -660,360 +584,379 @@ Expected: PASS.
 Run:
 
 ```bash
-git add Package.swift Sources/WireGuardKit/ObfuscationRuntime.swift Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift Tests/WireGuardKitTests/PacketTunnelSettingsGeneratorObfuscationTests.swift
-git commit -m "feat: rewrite obfuscated peer endpoints"
+git add Package.swift Sources/WireGuardKit/ObfuscationRouteExclusion.swift Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift Tests/WireGuardKitTests/ObfuscationRouteExclusionTests.swift
+git commit -m "feat: add obfuscation route hardening"
 ```
 
-## Task 4: Add Obfuscator Module and Fake-Codec Session Tests
+## Task 4: Add Go Obfuscator Config and Bind Tests
 
 **Files:**
-- Modify: `Package.swift`
-- Create: `Sources/WireGuardKitObfuscator/ObfuscationCodec.swift`
-- Create: `Sources/WireGuardKitObfuscator/ObfuscationSession.swift`
-- Create: `Sources/WireGuardKitObfuscator/ObfuscationSessionFactory.swift`
-- Create: `Tests/WireGuardKitObfuscatorTests/ObfuscationSessionTests.swift`
+- Create: `Sources/WireGuardKitGo/obfuscator/config.go`
+- Create: `Sources/WireGuardKitGo/obfuscator/codec.go`
+- Create: `Sources/WireGuardKitGo/obfuscator/bind.go`
+- Create: `Sources/WireGuardKitGo/obfuscator/config_test.go`
+- Create: `Sources/WireGuardKitGo/obfuscator/bind_test.go`
 
-- [ ] **Step 1: Add failing session test**
+- [ ] **Step 1: Write failing Go config tests**
 
-Create `Tests/WireGuardKitObfuscatorTests/ObfuscationSessionTests.swift`:
+Create `Sources/WireGuardKitGo/obfuscator/config_test.go`:
 
-```swift
-import XCTest
-import Network
-@testable import WireGuardKitObfuscator
+```go
+package obfuscator
 
-final class ObfuscationSessionTests: XCTestCase {
-    func testOutboundPacketIsEncodedAndSentToRemoteEndpoint() async throws {
-        let remote = try UDPTestServer()
-        try await remote.start()
+import "testing"
 
-        let codec = PrefixTestCodec(prefix: Data([0xAA, 0xBB]))
-        let session = EmbeddedObfuscationSession(
-            targetHost: "127.0.0.1",
-            targetPort: remote.port,
-            codec: codec
-        )
-        try await session.start()
-        defer { session.stop() }
-
-        let localClient = try UDPTestClient()
-        try await localClient.send(Data([0x01, 0x02, 0x03]), toPort: session.localPort)
-
-        let received = try await remote.receive(timeout: 2.0)
-        XCTAssertEqual(received, Data([0xAA, 0xBB, 0x01, 0x02, 0x03]))
-    }
-}
-
-private struct PrefixTestCodec: ObfuscationPacketCodec {
-    let prefix: Data
-
-    func encodeOutbound(_ packet: Data) throws -> Data {
-        prefix + packet
-    }
-
-    func decodeInbound(_ packet: Data) throws -> Data {
-        guard packet.starts(with: prefix) else { throw ObfuscationCodecError.invalidPacket }
-        return packet.dropFirst(prefix.count)
-    }
-}
-```
-
-Add small test helpers in the same file:
-
-```swift
-private final class UDPTestServer {
-    private let listener: NWListener
-    private var continuation: CheckedContinuation<Data, Error>?
-    private(set) var port: UInt16 = 0
-
-    init() throws {
-        listener = try NWListener(using: .udp, on: 0)
-    }
-
-    func start() async throws {
-        listener.newConnectionHandler = { [weak self] connection in
-            connection.start(queue: .global())
-            self?.receive(on: connection)
-        }
-        listener.start(queue: .global())
-        guard case .port(let nwPort) = listener.port else {
-            throw NSError(domain: "UDPTestServer", code: 1)
-        }
-        port = nwPort.rawValue
-    }
-
-    func receive(timeout: TimeInterval) async throws -> Data {
-        try await withThrowingTaskGroup(of: Data.self) { group in
-            group.addTask {
-                try await withCheckedThrowingContinuation { continuation in
-                    self.continuation = continuation
-                }
-            }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NSError(domain: "UDPTestServer", code: 2)
-            }
-            let value = try await group.next()!
-            group.cancelAll()
-            return value
-        }
-    }
-
-    private func receive(on connection: NWConnection) {
-        connection.receiveMessage { [weak self] data, _, _, error in
-            if let data {
-                self?.continuation?.resume(returning: data)
-            } else {
-                self?.continuation?.resume(throwing: error ?? NSError(domain: "UDPTestServer", code: 3))
-            }
+func TestConfigValidateAcceptsSupportedModes(t *testing.T) {
+    for _, mode := range []MaskingMode{MaskingSTUN, MaskingAUTO, MaskingNONE} {
+        cfg := Config{Key: "shared-secret", Masking: mode, MaxDummyBytes: 4, Enabled: true}
+        if err := cfg.Validate(); err != nil {
+            t.Fatalf("Validate() failed for %s: %v", mode, err)
         }
     }
 }
 
-private final class UDPTestClient {
-    func send(_ data: Data, toPort port: UInt16) async throws {
-        let connection = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!, using: .udp)
-        connection.start(queue: .global())
-        try await withCheckedThrowingContinuation { continuation in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-                connection.cancel()
-            })
-        }
+func TestConfigValidateRejectsEmptyKey(t *testing.T) {
+    cfg := Config{Key: "", Masking: MaskingAUTO, MaxDummyBytes: 4, Enabled: true}
+    if err := cfg.Validate(); err != ErrInvalidKeyLength {
+        t.Fatalf("expected ErrInvalidKeyLength, got %v", err)
+    }
+}
+
+func TestConfigValidateRejectsUnsupportedMode(t *testing.T) {
+    cfg := Config{Key: "shared-secret", Masking: MaskingMode("BAD"), MaxDummyBytes: 4, Enabled: true}
+    if err := cfg.Validate(); err != ErrUnsupportedMasking {
+        t.Fatalf("expected ErrUnsupportedMasking, got %v", err)
     }
 }
 ```
 
-- [ ] **Step 2: Add module target**
+- [ ] **Step 2: Write failing bind tests**
 
-Modify `Package.swift`:
+Create `Sources/WireGuardKitGo/obfuscator/bind_test.go`:
 
-```swift
-.library(name: "WireGuardKitObfuscator", targets: ["WireGuardKitObfuscator"]),
+```go
+package obfuscator
+
+import (
+    "errors"
+    "net/netip"
+    "testing"
+
+    "golang.zx2c4.com/wireguard/conn"
+)
+
+func TestBindSendEncodesBeforeDelegating(t *testing.T) {
+    base := newFakeBind([]fakeReceive{})
+    codec := fakeCodec{encoded: []byte{9, 8, 7}}
+    bind := NewBind(base, Config{Enabled: true, Key: "shared-secret", Masking: MaskingNONE}, codec)
+    endpoint, _ := base.ParseEndpoint("198.51.100.10:19999")
+
+    if err := bind.Send([]byte{1, 2, 3}, endpoint); err != nil {
+        t.Fatalf("Send() failed: %v", err)
+    }
+
+    if got := string(base.sent); got != string([]byte{9, 8, 7}) {
+        t.Fatalf("sent bytes = %v", base.sent)
+    }
+}
+
+func TestBindReceiveDecodesBeforeReturning(t *testing.T) {
+    endpoint := conn.StdNetEndpoint(netip.MustParseAddrPort("198.51.100.10:19999"))
+    base := newFakeBind([]fakeReceive{{packet: []byte{9, 8, 7}, endpoint: endpoint}})
+    codec := fakeCodec{decoded: []byte{1, 2, 3}}
+    bind := NewBind(base, Config{Enabled: true, Key: "shared-secret", Masking: MaskingNONE}, codec)
+
+    fns, _, err := bind.Open(0)
+    if err != nil {
+        t.Fatalf("Open() failed: %v", err)
+    }
+
+    buf := make([]byte, 16)
+    n, gotEndpoint, err := fns[0](buf)
+    if err != nil {
+        t.Fatalf("receive failed: %v", err)
+    }
+    if n != 3 || string(buf[:n]) != string([]byte{1, 2, 3}) {
+        t.Fatalf("decoded packet = %v", buf[:n])
+    }
+    if gotEndpoint.DstToString() != endpoint.DstToString() {
+        t.Fatalf("endpoint = %s", gotEndpoint.DstToString())
+    }
+}
+
+func TestBindReceiveDropsInvalidPacketsUntilValid(t *testing.T) {
+    endpoint := conn.StdNetEndpoint(netip.MustParseAddrPort("198.51.100.10:19999"))
+    base := newFakeBind([]fakeReceive{
+        {packet: []byte{0}, endpoint: endpoint},
+        {packet: []byte{9, 8, 7}, endpoint: endpoint},
+    })
+    codec := fakeCodec{decoded: []byte{1, 2, 3}, failFirstDecode: true}
+    bind := NewBind(base, Config{Enabled: true, Key: "shared-secret", Masking: MaskingNONE}, codec)
+
+    fns, _, err := bind.Open(0)
+    if err != nil {
+        t.Fatalf("Open() failed: %v", err)
+    }
+
+    buf := make([]byte, 16)
+    n, _, err := fns[0](buf)
+    if err != nil {
+        t.Fatalf("receive failed: %v", err)
+    }
+    if n != 3 {
+        t.Fatalf("n = %d", n)
+    }
+}
+
+type fakeCodec struct {
+    encoded []byte
+    decoded []byte
+    failFirstDecode bool
+    decodeCalls int
+}
+
+func (f *fakeCodec) Encode(packet []byte) ([]byte, error) {
+    if f.encoded != nil {
+        return f.encoded, nil
+    }
+    return append([]byte{}, packet...), nil
+}
+
+func (f *fakeCodec) Decode(packet []byte) ([]byte, error) {
+    f.decodeCalls++
+    if f.failFirstDecode && f.decodeCalls == 1 {
+        return nil, ErrInvalidPacket
+    }
+    if f.decoded != nil {
+        return f.decoded, nil
+    }
+    return append([]byte{}, packet...), nil
+}
+
+type fakeReceive struct {
+    packet []byte
+    endpoint conn.Endpoint
+    err error
+}
+
+type fakeBind struct {
+    receives []fakeReceive
+    sent []byte
+}
+
+func newFakeBind(receives []fakeReceive) *fakeBind {
+    return &fakeBind{receives: receives}
+}
+
+func (f *fakeBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
+    return []conn.ReceiveFunc{func(buf []byte) (int, conn.Endpoint, error) {
+        if len(f.receives) == 0 {
+            return 0, nil, errors.New("empty receive queue")
+        }
+        next := f.receives[0]
+        f.receives = f.receives[1:]
+        copy(buf, next.packet)
+        return len(next.packet), next.endpoint, next.err
+    }}, port, nil
+}
+
+func (f *fakeBind) Close() error { return nil }
+func (f *fakeBind) SetMark(mark uint32) error { return nil }
+func (f *fakeBind) Send(buf []byte, ep conn.Endpoint) error {
+    f.sent = append([]byte{}, buf...)
+    return nil
+}
+func (f *fakeBind) ParseEndpoint(s string) (conn.Endpoint, error) {
+    endpoint, err := netip.ParseAddrPort(s)
+    if err != nil {
+        return nil, err
+    }
+    return conn.StdNetEndpoint(endpoint), nil
+}
 ```
 
-Add target:
-
-```swift
-.target(
-    name: "WireGuardKitObfuscator",
-    dependencies: ["WireGuardKitTypes"]
-),
-```
-
-Add test target:
-
-```swift
-.testTarget(
-    name: "WireGuardKitObfuscatorTests",
-    dependencies: ["WireGuardKitObfuscator", "WireGuardKitTypes"]
-),
-```
-
-- [ ] **Step 3: Run test to verify it fails**
+- [ ] **Step 3: Run Go tests to confirm failure**
 
 Run:
 
 ```bash
-swift test --filter ObfuscationSessionTests
+cd Sources/WireGuardKitGo
+go test ./obfuscator
 ```
 
-Expected: FAIL because the obfuscator module types do not exist.
+Expected: FAIL because the obfuscator package implementation does not exist.
 
-- [ ] **Step 4: Add codec boundary**
+- [ ] **Step 4: Implement Go config**
 
-Create `Sources/WireGuardKitObfuscator/ObfuscationCodec.swift`:
+Create `Sources/WireGuardKitGo/obfuscator/config.go`:
 
-```swift
-// SPDX-License-Identifier: MIT
-// Copyright © 2026 WireGuard LLC. All Rights Reserved.
+```go
+package obfuscator
 
-import Foundation
-import WireGuardKitTypes
+import "errors"
 
-public enum ObfuscationCodecError: Error, Equatable {
-    case invalidPacket
-    case unsupportedMasking(ObfuscationMasking)
+type MaskingMode string
+
+const (
+    MaskingSTUN MaskingMode = "STUN"
+    MaskingAUTO MaskingMode = "AUTO"
+    MaskingNONE MaskingMode = "NONE"
+)
+
+var (
+    ErrInvalidKeyLength = errors.New("invalid obfuscation key length")
+    ErrUnsupportedMasking = errors.New("unsupported obfuscation masking mode")
+    ErrInvalidPacket = errors.New("invalid obfuscated packet")
+)
+
+type Config struct {
+    Enabled bool
+    Key string
+    Masking MaskingMode
+    MaxDummyBytes uint16
 }
 
-public protocol ObfuscationPacketCodec {
-    func encodeOutbound(_ packet: Data) throws -> Data
-    func decodeInbound(_ packet: Data) throws -> Data
-}
-
-public struct WgObfuscatorCompatibleCodec: ObfuscationPacketCodec {
-    public let key: String
-    public let masking: ObfuscationMasking
-    public let maxDummyBytes: UInt16
-
-    public init(key: String, masking: ObfuscationMasking, maxDummyBytes: UInt16) {
-        self.key = key
-        self.masking = masking
-        self.maxDummyBytes = maxDummyBytes
+func (c Config) Validate() error {
+    if !c.Enabled {
+        return nil
     }
-
-    public func encodeOutbound(_ packet: Data) throws -> Data {
-        throw ObfuscationCodecError.invalidPacket
+    if len([]byte(c.Key)) < 1 || len([]byte(c.Key)) > 255 {
+        return ErrInvalidKeyLength
     }
-
-    public func decodeInbound(_ packet: Data) throws -> Data {
-        throw ObfuscationCodecError.invalidPacket
+    switch c.Masking {
+    case MaskingSTUN, MaskingAUTO, MaskingNONE:
+        return nil
+    default:
+        return ErrUnsupportedMasking
     }
 }
 ```
 
-The clean-room codec intentionally fails until Task 7 replaces it. The session tests use `PrefixTestCodec`, so they can pass without protocol compatibility work.
+- [ ] **Step 5: Implement codec boundary**
 
-- [ ] **Step 5: Add session implementation**
+Create `Sources/WireGuardKitGo/obfuscator/codec.go`:
 
-Create `Sources/WireGuardKitObfuscator/ObfuscationSession.swift`:
+```go
+package obfuscator
 
-```swift
-// SPDX-License-Identifier: MIT
-// Copyright © 2026 WireGuard LLC. All Rights Reserved.
-
-import Foundation
-import Network
-
-public enum ObfuscationSessionError: Error, Equatable {
-    case localPortUnavailable
-    case notStarted
-    case missingLocalWireGuardSource
+type Codec interface {
+    Encode(packet []byte) ([]byte, error)
+    Decode(packet []byte) ([]byte, error)
 }
 
-public protocol ObfuscationSession: AnyObject {
-    var localPort: UInt16 { get }
-    func start() async throws
-    func stop()
-    func updateTarget(host: NWEndpoint.Host, port: NWEndpoint.Port)
+type CleanRoomCodec struct {
+    config Config
 }
 
-public final class EmbeddedObfuscationSession: ObfuscationSession {
-    public private(set) var localPort: UInt16 = 0
+func NewCleanRoomCodec(config Config) *CleanRoomCodec {
+    return &CleanRoomCodec{config: config}
+}
 
-    private var listener: NWListener?
-    private var localWireGuardConnection: NWConnection?
-    private var remoteConnection: NWConnection?
-    private var targetHost: NWEndpoint.Host
-    private var targetPort: NWEndpoint.Port
-    private let codec: ObfuscationPacketCodec
-    private let queue = DispatchQueue(label: "EmbeddedObfuscationSession")
+func (c *CleanRoomCodec) Encode(packet []byte) ([]byte, error) {
+    if len(packet) == 0 {
+        return nil, ErrInvalidPacket
+    }
+    encoded := make([]byte, len(packet))
+    key := []byte(c.config.Key)
+    for i, b := range packet {
+        encoded[i] = b ^ key[i%len(key)]
+    }
+    return encoded, nil
+}
 
-    public init(targetHost: NWEndpoint.Host, targetPort: NWEndpoint.Port, codec: ObfuscationPacketCodec) {
-        self.targetHost = targetHost
-        self.targetPort = targetPort
-        self.codec = codec
+func (c *CleanRoomCodec) Decode(packet []byte) ([]byte, error) {
+    if len(packet) == 0 {
+        return nil, ErrInvalidPacket
+    }
+    decoded := make([]byte, len(packet))
+    key := []byte(c.config.Key)
+    for i, b := range packet {
+        decoded[i] = b ^ key[i%len(key)]
+    }
+    return decoded, nil
+}
+```
+
+This codec is a testable boundary. Task 8 replaces its internals based on black-box upstream behavior.
+
+- [ ] **Step 6: Implement bind wrapper**
+
+Create `Sources/WireGuardKitGo/obfuscator/bind.go`:
+
+```go
+package obfuscator
+
+import "golang.zx2c4.com/wireguard/conn"
+
+type Bind struct {
+    base conn.Bind
+    config Config
+    codec Codec
+}
+
+func NewBind(base conn.Bind, config Config, codec Codec) *Bind {
+    if codec == nil {
+        codec = NewCleanRoomCodec(config)
+    }
+    return &Bind{base: base, config: config, codec: codec}
+}
+
+func (b *Bind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
+    fns, actualPort, err := b.base.Open(port)
+    if err != nil {
+        return nil, 0, err
     }
 
-    public convenience init(targetHost: String, targetPort: UInt16, codec: ObfuscationPacketCodec) {
-        self.init(targetHost: NWEndpoint.Host(targetHost), targetPort: NWEndpoint.Port(rawValue: targetPort)!, codec: codec)
-    }
-
-    public func start() async throws {
-        let listener = try NWListener(using: .udp, on: 0)
-        listener.newConnectionHandler = { [weak self] connection in
-            self?.localWireGuardConnection = connection
-            connection.start(queue: self?.queue ?? .global())
-            self?.receiveLocal(on: connection)
-        }
-        listener.start(queue: queue)
-        guard let port = listener.port?.rawValue else {
-            listener.cancel()
-            throw ObfuscationSessionError.localPortUnavailable
-        }
-        self.listener = listener
-        self.localPort = port
-        startRemoteConnection()
-    }
-
-    public func stop() {
-        listener?.cancel()
-        listener = nil
-        localWireGuardConnection?.cancel()
-        localWireGuardConnection = nil
-        remoteConnection?.cancel()
-        remoteConnection = nil
-        localPort = 0
-    }
-
-    public func updateTarget(host: NWEndpoint.Host, port: NWEndpoint.Port) {
-        queue.async {
-            self.targetHost = host
-            self.targetPort = port
-            self.remoteConnection?.cancel()
-            self.startRemoteConnection()
-        }
-    }
-
-    private func startRemoteConnection() {
-        let connection = NWConnection(host: targetHost, port: targetPort, using: .udp)
-        remoteConnection = connection
-        connection.start(queue: queue)
-        receiveRemote(on: connection)
-    }
-
-    private func receiveLocal(on connection: NWConnection) {
-        connection.receiveMessage { [weak self] data, _, _, _ in
-            guard let self else { return }
-            if let data, let encoded = try? self.codec.encodeOutbound(data) {
-                self.remoteConnection?.send(content: encoded, completion: .contentProcessed { _ in })
+    wrapped := make([]conn.ReceiveFunc, 0, len(fns))
+    for _, receive := range fns {
+        receive := receive
+        wrapped = append(wrapped, func(buf []byte) (int, conn.Endpoint, error) {
+            for {
+                n, endpoint, err := receive(buf)
+                if err != nil {
+                    return 0, endpoint, err
+                }
+                decoded, err := b.codec.Decode(buf[:n])
+                if err != nil {
+                    continue
+                }
+                copy(buf, decoded)
+                return len(decoded), endpoint, nil
             }
-            self.receiveLocal(on: connection)
-        }
+        })
     }
 
-    private func receiveRemote(on connection: NWConnection) {
-        connection.receiveMessage { [weak self] data, _, _, _ in
-            guard let self else { return }
-            if let data, let decoded = try? self.codec.decodeInbound(data) {
-                self.localWireGuardConnection?.send(content: decoded, completion: .contentProcessed { _ in })
-            }
-            self.receiveRemote(on: connection)
-        }
+    return wrapped, actualPort, nil
+}
+
+func (b *Bind) Close() error {
+    return b.base.Close()
+}
+
+func (b *Bind) SetMark(mark uint32) error {
+    return b.base.SetMark(mark)
+}
+
+func (b *Bind) Send(buf []byte, endpoint conn.Endpoint) error {
+    encoded, err := b.codec.Encode(buf)
+    if err != nil {
+        return err
     }
+    return b.base.Send(encoded, endpoint)
+}
+
+func (b *Bind) ParseEndpoint(s string) (conn.Endpoint, error) {
+    return b.base.ParseEndpoint(s)
 }
 ```
 
-- [ ] **Step 6: Add factory**
-
-Create `Sources/WireGuardKitObfuscator/ObfuscationSessionFactory.swift`:
-
-```swift
-// SPDX-License-Identifier: MIT
-// Copyright © 2026 WireGuard LLC. All Rights Reserved.
-
-import Foundation
-import Network
-import WireGuardKitTypes
-
-public protocol ObfuscationSessionFactory {
-    func makeSession(targetHost: NWEndpoint.Host, targetPort: NWEndpoint.Port, peerConfiguration: PeerObfuscationConfiguration) -> ObfuscationSession
-}
-
-public struct DefaultObfuscationSessionFactory: ObfuscationSessionFactory {
-    public init() {}
-
-    public func makeSession(targetHost: NWEndpoint.Host, targetPort: NWEndpoint.Port, peerConfiguration: PeerObfuscationConfiguration) -> ObfuscationSession {
-        let codec = WgObfuscatorCompatibleCodec(
-            key: peerConfiguration.key,
-            masking: peerConfiguration.masking,
-            maxDummyBytes: peerConfiguration.maxDummyBytes
-        )
-        return EmbeddedObfuscationSession(targetHost: targetHost, targetPort: targetPort, codec: codec)
-    }
-}
-```
-
-- [ ] **Step 7: Run tests**
+- [ ] **Step 7: Run Go tests**
 
 Run:
 
 ```bash
-swift test --filter ObfuscationSessionTests
+cd Sources/WireGuardKitGo
+go test ./obfuscator
 ```
 
 Expected: PASS.
@@ -1023,37 +966,172 @@ Expected: PASS.
 Run:
 
 ```bash
-git add Package.swift Sources/WireGuardKitObfuscator Tests/WireGuardKitObfuscatorTests
-git commit -m "feat: add embedded obfuscation session"
+git add Sources/WireGuardKitGo/obfuscator
+git commit -m "feat: add obfuscating bind wrapper"
 ```
 
-## Task 5: Wire Obfuscation Sessions into WireGuardAdapter
+## Task 5: Add C Bridge Configuration
 
 **Files:**
+- Modify: `Sources/WireGuardKitGo/wireguard.h`
+- Modify: `Sources/WireGuardKitGo/api-apple.go`
+- Create: `Sources/WireGuardKitGo/obfuscation_config_test.go`
+
+- [ ] **Step 1: Add failing Go bridge config tests**
+
+Create `Sources/WireGuardKitGo/obfuscation_config_test.go`:
+
+```go
+package main
+
+import (
+    "testing"
+
+    "golang.zx2c4.com/wireguard/apple/obfuscator"
+    "golang.zx2c4.com/wireguard/conn"
+)
+
+func TestMaybeObfuscatingBindReturnsBaseWhenDisabled(t *testing.T) {
+    base := &bridgeFakeBind{}
+    bind := maybeWrapObfuscationBind(base, obfuscator.Config{})
+    if bind != base {
+        t.Fatalf("disabled config should return base bind")
+    }
+}
+
+func TestMaybeObfuscatingBindWrapsWhenEnabled(t *testing.T) {
+    base := &bridgeFakeBind{}
+    bind := maybeWrapObfuscationBind(base, obfuscator.Config{
+        Enabled: true,
+        Key: "shared-secret",
+        Masking: obfuscator.MaskingSTUN,
+        MaxDummyBytes: 4,
+    })
+    if _, ok := bind.(*obfuscator.Bind); !ok {
+        t.Fatalf("enabled config should return *obfuscator.Bind, got %T", bind)
+    }
+}
+```
+
+Add minimal fake bind in the same file:
+
+```go
+type bridgeFakeBind struct{}
+
+func (*bridgeFakeBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) { return nil, port, nil }
+func (*bridgeFakeBind) Close() error { return nil }
+func (*bridgeFakeBind) SetMark(mark uint32) error { return nil }
+func (*bridgeFakeBind) Send(buf []byte, ep conn.Endpoint) error { return nil }
+func (*bridgeFakeBind) ParseEndpoint(s string) (conn.Endpoint, error) { return nil, nil }
+```
+
+- [ ] **Step 2: Run bridge tests to confirm failure**
+
+Run:
+
+```bash
+cd Sources/WireGuardKitGo
+go test ./... -run 'TestMaybeObfuscatingBind'
+```
+
+Expected: FAIL because `maybeWrapObfuscationBind` does not exist.
+
+- [ ] **Step 3: Add C bridge structs**
+
+Modify `Sources/WireGuardKitGo/wireguard.h`:
+
+```c
+typedef struct WgObfuscationConfig {
+    bool enabled;
+    const char *key;
+    const char *masking;
+    uint16_t max_dummy_bytes;
+} WgObfuscationConfig;
+```
+
+Update function declarations:
+
+```c
+extern int wgTurnOnIAN(const char *settings, int32_t tun_fd, const char *private_ip, const char *maybeNotMachines, DaitaGoParameters *daitaParameters, WgObfuscationConfig *obfuscationConfig);
+extern int wgTurnOn(const char *settings, int32_t tun_fd, const char *maybeNotMachines, DaitaGoParameters *daitaParameters, WgObfuscationConfig *obfuscationConfig);
+extern int wgTurnOnMultihop(const char *exitSettings, const char *entrySettings, const char *privateIp, int32_t tun_fd, const char *maybenotMachines, DaitaGoParameters *daitaParameters, WgObfuscationConfig *entryObfuscationConfig);
+```
+
+- [ ] **Step 4: Add Go config conversion and wrapper helper**
+
+Modify `Sources/WireGuardKitGo/api-apple.go` imports:
+
+```go
+"golang.zx2c4.com/wireguard/apple/obfuscator"
+```
+
+Add helper functions:
+
+```go
+func obfuscationConfigFromRaw(raw *C.WgObfuscationConfig) obfuscator.Config {
+    if raw == nil || !bool(raw.enabled) {
+        return obfuscator.Config{}
+    }
+    return obfuscator.Config{
+        Enabled: true,
+        Key: C.GoString(raw.key),
+        Masking: obfuscator.MaskingMode(C.GoString(raw.masking)),
+        MaxDummyBytes: uint16(raw.max_dummy_bytes),
+    }
+}
+
+func maybeWrapObfuscationBind(base conn.Bind, config obfuscator.Config) conn.Bind {
+    if !config.Enabled {
+        return base
+    }
+    if err := config.Validate(); err != nil {
+        return base
+    }
+    return obfuscator.NewBind(base, config, nil)
+}
+```
+
+- [ ] **Step 5: Run bridge tests**
+
+Run:
+
+```bash
+cd Sources/WireGuardKitGo
+go test ./... -run 'TestMaybeObfuscatingBind'
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+Run:
+
+```bash
+git add Sources/WireGuardKitGo/wireguard.h Sources/WireGuardKitGo/api-apple.go Sources/WireGuardKitGo/obfuscation_config_test.go
+git commit -m "feat: add obfuscation bridge config"
+```
+
+## Task 6: Wrap Single-Hop and Multihop Entry Binds
+
+**Files:**
+- Modify: `Sources/WireGuardKitGo/api-apple.go`
 - Modify: `Sources/WireGuardKit/WireGuardAdapter.swift`
 - Modify: `Sources/WireGuardNetworkExtension/PacketTunnelProvider.swift`
-- Modify: `Package.swift`
 
 - [ ] **Step 1: Add adapter error cases**
 
-Modify `WireGuardAdapterError` in `Sources/WireGuardKit/WireGuardAdapter.swift`:
+Modify `WireGuardAdapterError`:
 
 ```swift
 case obfuscationConfiguration(String)
-case obfuscationStart(String)
 case obfuscationRouteUpdate(String)
 ```
 
-Update `PacketTunnelProvider.startTunnel` switch:
+Update `PacketTunnelProvider.startTunnel`:
 
 ```swift
 case .obfuscationConfiguration(let message):
     wg_log(.error, message: "Starting tunnel failed with invalid obfuscation configuration: \(message)")
-    errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
-    completionHandler(PacketTunnelProviderError.couldNotStartBackend)
-
-case .obfuscationStart(let message):
-    wg_log(.error, message: "Starting tunnel failed while starting obfuscation: \(message)")
     errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
     completionHandler(PacketTunnelProviderError.couldNotStartBackend)
 
@@ -1063,226 +1141,186 @@ case .obfuscationRouteUpdate(let message):
     completionHandler(PacketTunnelProviderError.couldNotSetNetworkSettings)
 ```
 
-- [ ] **Step 2: Add dependency on WireGuardKitObfuscator**
+- [ ] **Step 2: Update Go function signatures and bind construction**
 
-Modify `Package.swift`:
+Modify `wgTurnOnIANFromExistingTunnel` to accept `obfuscationConfig obfuscator.Config` and construct:
 
-```swift
-.target(
-    name: "WireGuardKit",
-    dependencies: ["WireGuardKitGo", "WireGuardKitTypes", "WireGuardKitObfuscator"]
-),
+```go
+baseBind := conn.NewStdNetBind()
+bind := maybeWrapObfuscationBind(baseBind, obfuscationConfig)
+dev := device.NewDevice(&wrapper, bind, logger)
 ```
 
-Add import in `WireGuardAdapter.swift`:
+Modify exported `wgTurnOnIAN`:
 
-```swift
-#if SWIFT_PACKAGE
-import WireGuardKitObfuscator
-#endif
-```
-
-- [ ] **Step 3: Add session state**
-
-Add to `WireGuardAdapter`:
-
-```swift
-private var obfuscationSessions = [PublicKey: ObfuscationSession]()
-private let obfuscationSessionFactory: ObfuscationSessionFactory
-```
-
-Change initializer:
-
-```swift
-public init(
-    with packetTunnelProvider: NEPacketTunnelProvider,
-    shouldHandleReasserting: Bool = true,
-    obfuscationSessionFactory: ObfuscationSessionFactory = DefaultObfuscationSessionFactory(),
-    logHandler: @escaping LogHandler
-) {
-    self.packetTunnelProvider = packetTunnelProvider
-    self.shouldHandleReasserting = shouldHandleReasserting
-    self.obfuscationSessionFactory = obfuscationSessionFactory
-    self.logHandler = logHandler
-
-    setupLogHandler()
+```go
+func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachines *C.char, daitaParameters *C.DaitaGoParameters, rawObfuscationConfig *C.WgObfuscationConfig) int32 {
+    ...
+    obfuscationConfig := obfuscationConfigFromRaw(rawObfuscationConfig)
+    return wgTurnOnIANFromExistingTunnel(tun, C.GoString(settings), privateAddr, daitaParams, obfuscationConfig)
 }
 ```
 
-- [ ] **Step 4: Add runtime preparation helper**
+Modify multihop entry device construction:
 
-Add to `WireGuardAdapter`:
+```go
+entryBaseBind := conn.NewStdNetBind()
+entryBind := maybeWrapObfuscationBind(entryBaseBind, obfuscationConfigFromRaw(rawEntryObfuscationConfig))
+entryDev := device.NewDevice(&singletun, entryBind, logger)
+```
+
+Keep exit device bind unchanged:
+
+```go
+exitDev := device.NewDevice(&wrapper, singletun.Binder(), logger)
+```
+
+- [ ] **Step 3: Build Swift C config helper**
+
+Add to `WireGuardAdapter.swift`:
 
 ```swift
-private func prepareObfuscationRuntime(for configuration: TunnelConfiguration, resolvedEndpoints: [Endpoint?]) throws -> ObfuscationRuntime {
-    guard let obfuscation = configuration.obfuscation, !obfuscation.peers.isEmpty else {
-        stopObfuscationSessions()
-        return .empty
+private func makeGoObfuscationConfig(for tunnelConfiguration: TunnelConfiguration) throws -> WgObfuscationConfig {
+    guard let obfuscation = tunnelConfiguration.obfuscation else {
+        return WgObfuscationConfig(enabled: false, key: nil, masking: nil, max_dummy_bytes: 0)
     }
-
-    guard obfuscation.peers.count == 1 else {
-        throw WireGuardAdapterError.obfuscationConfiguration("Only one obfuscated peer is supported")
+    let validated = try obfuscation.validatedForSinglePhysicalTransport()
+    guard let peer = validated.peers.first(where: { $0.transportLeg == .physical }) else {
+        return WgObfuscationConfig(enabled: false, key: nil, masking: nil, max_dummy_bytes: 0)
     }
-
-    let peerObfuscation = obfuscation.peers[0]
-    guard let peerIndex = configuration.peers.firstIndex(where: { $0.publicKey == peerObfuscation.peerPublicKey }) else {
+    guard tunnelConfiguration.peers.contains(where: { $0.publicKey == peer.peerPublicKey }) else {
         throw WireGuardAdapterError.obfuscationConfiguration("Obfuscated peer public key is not present in tunnel configuration")
     }
-    guard let resolvedEndpoint = resolvedEndpoints[peerIndex] else {
-        throw WireGuardAdapterError.obfuscationConfiguration("Obfuscated peer has no endpoint")
-    }
-    guard case .ipv4(let targetIPv4) = resolvedEndpoint.host else {
-        throw WireGuardAdapterError.obfuscationConfiguration("Obfuscated peer endpoint must resolve to IPv4")
-    }
 
-    let targetPort = resolvedEndpoint.port
-    let session = obfuscationSessionFactory.makeSession(
-        targetHost: .ipv4(targetIPv4),
-        targetPort: targetPort,
-        peerConfiguration: peerObfuscation
-    )
-
-    let semaphore = DispatchSemaphore(value: 0)
-    var startError: Error?
-    Task {
-        do {
-            try await session.start()
-        } catch {
-            startError = error
-        }
-        semaphore.signal()
-    }
-    semaphore.wait()
-
-    if let startError {
-        throw WireGuardAdapterError.obfuscationStart(String(describing: startError))
-    }
-
-    stopObfuscationSessions()
-    obfuscationSessions[peerObfuscation.peerPublicKey] = session
-
-    let localEndpoint = Endpoint(host: .ipv4(IPv4Address("127.0.0.1")!), port: NWEndpoint.Port(rawValue: session.localPort)!)
-    return ObfuscationRuntime(
-        endpointOverrides: [peerObfuscation.peerPublicKey: localEndpoint],
-        excludedIPv4Addresses: [targetIPv4]
+    return WgObfuscationConfig(
+        enabled: true,
+        key: strdup(peer.key),
+        masking: strdup(peer.masking.rawValue),
+        max_dummy_bytes: peer.maxDummyBytes
     )
 }
 
-private func stopObfuscationSessions() {
-    obfuscationSessions.values.forEach { $0.stop() }
-    obfuscationSessions.removeAll()
+private func freeGoObfuscationConfig(_ config: inout WgObfuscationConfig) {
+    if let key = config.key {
+        free(UnsafeMutableRawPointer(mutating: key))
+        config.key = nil
+    }
+    if let masking = config.masking {
+        free(UnsafeMutableRawPointer(mutating: masking))
+        config.masking = nil
+    }
 }
 ```
 
-- [ ] **Step 5: Pass runtime into settings generator**
+- [ ] **Step 4: Pass config to Go start functions**
 
-In `makeSettingsGenerator(...)`, after resolving exit endpoints:
-
-```swift
-let obfuscationRuntime = try prepareObfuscationRuntime(for: exitConfiguration, resolvedEndpoints: resolvedExitEndpoints)
-```
-
-Create exit device with runtime:
+In `startWireGuardBackend(...)`, add parameter:
 
 ```swift
-exit: DeviceConfiguration(
-    configuration: exitConfiguration,
-    resolvedEndpoints: resolvedExitEndpoints,
-    reResolveEndpoint: entry == nil,
-    obfuscationRuntime: obfuscationRuntime
-),
+obfuscationConfiguration: ObfuscationConfiguration?
 ```
 
-Pass `obfuscationRuntime` to `PacketTunnelSettingsGenerator`.
-
-- [ ] **Step 6: Stop sessions during cleanup**
-
-In `stop(completionHandler:)`, after `wgTurnOff(handle)` and temporary shutdown handling:
+Before calling Go:
 
 ```swift
-self.stopObfuscationSessions()
+var obfsConfig = try makeGoObfuscationConfig(for: settingsGenerator.exit.configuration)
+defer { freeGoObfuscationConfig(&obfsConfig) }
 ```
 
-In `deinit`, after `wgTurnOff(handle)`:
+Call:
 
 ```swift
-stopObfuscationSessions()
+wgTurnOnIAN(exitWgConfig, tunnelFileDescriptor, privateAddr, daita?.machines ?? nil, &params, &obfsConfig)
 ```
 
-In `startMultihop` catch block before completion:
+For multihop:
 
 ```swift
-self.stopObfuscationSessions()
+wgTurnOnMultihop(exitWgConfig, entryWgConfig, privateAddr, tunnelFileDescriptor, daita?.machines ?? nil, &params, &obfsConfig)
 ```
 
-- [ ] **Step 7: Run targeted tests**
+This first slice uses the same physical obfuscation config for single-hop and multihop entry leg.
+
+- [ ] **Step 5: Run Go and Swift focused tests**
 
 Run:
 
 ```bash
+cd Sources/WireGuardKitGo
+go test ./... -run 'TestMaybeObfuscatingBind|TestConfigValidate|TestBind'
+cd ../..
 swift test --filter ObfuscationConfigurationTests
-swift test --filter PacketTunnelSettingsGeneratorObfuscationTests
-swift test --filter ObfuscationSessionTests
 ```
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 Run:
 
 ```bash
-git add Package.swift Sources/WireGuardKit/WireGuardAdapter.swift Sources/WireGuardNetworkExtension/PacketTunnelProvider.swift
-git commit -m "feat: start obfuscation sessions from adapter"
+git add Sources/WireGuardKitGo/api-apple.go Sources/WireGuardKit/WireGuardAdapter.swift Sources/WireGuardNetworkExtension/PacketTunnelProvider.swift
+git commit -m "feat: wrap wireguard transport with obfuscation bind"
 ```
 
-## Task 6: Handle Network Changes Without Reintroducing utun Loops
+## Task 7: Apply Route Hardening From Adapter
 
 **Files:**
 - Modify: `Sources/WireGuardKit/WireGuardAdapter.swift`
 - Modify: `Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift`
-- Test: `Tests/WireGuardKitTests/PacketTunnelSettingsGeneratorObfuscationTests.swift`
 
-- [ ] **Step 1: Add route update regression test**
+- [ ] **Step 1: Prepare excluded route during settings generation**
 
-Append to `PacketTunnelSettingsGeneratorObfuscationTests`:
+In `makeSettingsGenerator(...)`, after resolving exit endpoints:
 
 ```swift
-func testEndpointUpdateKeepsLoopbackEndpointAndExcludedRoute() throws {
-    let publicKey = PublicKey(base64Key: "bm9uY2Vub25jZW5vbmNlbm9uY2Vub25jZW5vbmNlbm9uY2U=")!
-    let runtime = ObfuscationRuntime(
-        endpointOverrides: [publicKey: Endpoint(from: "127.0.0.1:40000")!],
-        excludedIPv4Addresses: [IPv4Address("203.0.113.22")!]
-    )
+let obfuscationRoutes = try makeObfuscationExcludedRoutes(for: exitConfiguration, resolvedEndpoints: resolvedExitEndpoints)
+```
 
-    XCTAssertEqual(runtime.endpointOverride(for: publicKey)?.stringRepresentation, "127.0.0.1:40000")
-    XCTAssertEqual(runtime.excludedIPv4Routes().first?.destinationAddress, "203.0.113.22")
+Add helper:
+
+```swift
+private func makeObfuscationExcludedRoutes(for configuration: TunnelConfiguration, resolvedEndpoints: [Endpoint?]) throws -> [NEIPv4Route] {
+    guard let obfuscation = configuration.obfuscation else { return [] }
+    let validated = try obfuscation.validatedForSinglePhysicalTransport()
+    guard let physicalPeer = validated.peers.first(where: { $0.transportLeg == .physical }) else {
+        return []
+    }
+    guard let index = configuration.peers.firstIndex(where: { $0.publicKey == physicalPeer.peerPublicKey }) else {
+        throw WireGuardAdapterError.obfuscationConfiguration("Obfuscated peer public key is not present in tunnel configuration")
+    }
+    guard let endpoint = resolvedEndpoints[index] else {
+        throw WireGuardAdapterError.obfuscationConfiguration("Obfuscated peer has no endpoint")
+    }
+    do {
+        return [try ObfuscationRouteExclusion.excludedIPv4Route(for: endpoint)]
+    } catch {
+        throw WireGuardAdapterError.obfuscationConfiguration("Obfuscated peer endpoint must resolve to IPv4 for route hardening")
+    }
 }
 ```
 
-- [ ] **Step 2: Run test**
-
-Run:
-
-```bash
-swift test --filter PacketTunnelSettingsGeneratorObfuscationTests/testEndpointUpdateKeepsLoopbackEndpointAndExcludedRoute
-```
-
-Expected: PASS after Task 3.
-
-- [ ] **Step 3: Update path-change behavior**
-
-In iOS `didReceivePathUpdate`, before calling `settingsGenerator.endpointUapiConfiguration()`, detect obfuscation runtime:
+Pass routes into exit `DeviceConfiguration`:
 
 ```swift
-let (wgConfig, resolutionResults) = settingsGenerator.endpointUapiConfiguration()
-self.logEndpointResolutionResults(resolutionResults)
+DeviceConfiguration(
+    configuration: exitConfiguration,
+    resolvedEndpoints: resolvedExitEndpoints,
+    reResolveEndpoint: entry == nil,
+    obfuscationExcludedRoutes: obfuscationRoutes
+)
+```
 
-if !settingsGenerator.obfuscationRuntime.excludedIPv4Addresses.isEmpty {
+- [ ] **Step 2: Preserve route hardening on iOS path changes**
+
+In `didReceivePathUpdate(path:)`, keep the existing endpoint update flow, but ensure `settingsGenerator.generateNetworkSettings()` is applied before `wgSetConfig(...)` when `settingsGenerator.exit.obfuscationExcludedRoutes` is non-empty:
+
+```swift
+if !settingsGenerator.exit.obfuscationExcludedRoutes.isEmpty {
     let networkSettings = settingsGenerator.generateNetworkSettings()
     self.packetTunnelProvider?.setTunnelNetworkSettings(networkSettings) { error in
         if let error {
-            self.logHandler(.error, "Failed to update obfuscation excluded routes: \(error.localizedDescription)")
+            self.logHandler(.error, "Failed to update obfuscation route hardening: \(error.localizedDescription)")
             return
         }
         wgSetConfig(handle, wgConfig, nil)
@@ -1293,388 +1331,180 @@ if !settingsGenerator.obfuscationRuntime.excludedIPv4Addresses.isEmpty {
 }
 ```
 
-Keep the existing non-obfuscated path unchanged.
-
-- [ ] **Step 4: Add comment documenting anti-loop invariant**
-
-Near the route-update block:
-
-```swift
-// Obfuscator outer UDP must bypass utun. Apply the real-server /32 exclusion
-// before allowing wireguard-go to send packets toward the loopback obfuscator.
-```
-
-- [ ] **Step 5: Run targeted tests**
+- [ ] **Step 3: Run focused Swift tests**
 
 Run:
 
 ```bash
-swift test --filter PacketTunnelSettingsGeneratorObfuscationTests
+swift test --filter ObfuscationRouteExclusionTests
 ```
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 4: Commit**
 
 Run:
 
 ```bash
-git add Sources/WireGuardKit/WireGuardAdapter.swift Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift Tests/WireGuardKitTests/PacketTunnelSettingsGeneratorObfuscationTests.swift
-git commit -m "fix: preserve obfuscation route exclusions on path changes"
+git add Sources/WireGuardKit/WireGuardAdapter.swift Sources/WireGuardKit/PacketTunnelSettingsGenerator.swift
+git commit -m "fix: preserve obfuscation route hardening"
 ```
 
-## Task 7: Implement Clean-Room Codec Compatibility Harness
+## Task 8: Add Codec Compatibility Harness
 
 **Files:**
-- Modify: `Sources/WireGuardKitObfuscator/ObfuscationCodec.swift`
-- Create: `Tests/WireGuardKitObfuscatorCompatibilityTests/ExternalWgObfuscatorCompatibilityTests.swift`
-- Modify: `Package.swift`
+- Modify: `Sources/WireGuardKitGo/obfuscator/codec.go`
+- Create: `Sources/WireGuardKitGo/obfuscator/compat_test.go`
 
-- [ ] **Step 1: Add external compatibility test target**
+- [ ] **Step 1: Add black-box compatibility test skeleton**
 
-Modify `Package.swift`:
+Create `Sources/WireGuardKitGo/obfuscator/compat_test.go`:
 
-```swift
-.testTarget(
-    name: "WireGuardKitObfuscatorCompatibilityTests",
-    dependencies: ["WireGuardKitObfuscator", "WireGuardKitTypes"]
-),
-```
+```go
+package obfuscator
 
-- [ ] **Step 2: Add compatibility tests**
+import (
+    "net"
+    "os"
+    "os/exec"
+    "testing"
+    "time"
+)
 
-Create `Tests/WireGuardKitObfuscatorCompatibilityTests/ExternalWgObfuscatorCompatibilityTests.swift`:
-
-```swift
-import XCTest
-import Darwin
-import Network
-@testable import WireGuardKitObfuscator
-@testable import WireGuardKitTypes
-
-final class ExternalWgObfuscatorCompatibilityTests: XCTestCase {
-    func testCodecRejectsInvalidPackets() throws {
-        let codec = WgObfuscatorCompatibleCodec(key: "shared-secret", masking: .stun, maxDummyBytes: 4)
-
-        XCTAssertThrowsError(try codec.decodeInbound(Data([0x00, 0x01, 0x02])))
+func TestExternalWgObfuscatorAcceptsEncodedPacket(t *testing.T) {
+    binary := os.Getenv("WG_OBFUSCATOR_BIN")
+    if binary == "" {
+        t.Skip("set WG_OBFUSCATOR_BIN to a built upstream wg-obfuscator binary")
     }
 
-    func testNoneModeRoundTrip() throws {
-        let codec = WgObfuscatorCompatibleCodec(key: "shared-secret", masking: .none, maxDummyBytes: 0)
-        let packet = Data([0x01, 0x00, 0x00, 0x00]) + Data(repeating: 0x11, count: 144)
-
-        let encoded = try codec.encodeOutbound(packet)
-        let decoded = try codec.decodeInbound(encoded)
-
-        XCTAssertEqual(decoded, packet)
-        XCTAssertNotEqual(encoded, packet)
+    target, err := net.ListenPacket("udp4", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("target listen: %v", err)
     }
-}
-```
+    defer target.Close()
 
-Add an external process test in the same file:
-
-```swift
-func testExternalServerReceivesClientEncodedPacket() async throws {
-    guard let binary = ProcessInfo.processInfo.environment["WG_OBFUSCATOR_BIN"] else {
-        throw XCTSkip("Set WG_OBFUSCATOR_BIN to a built upstream wg-obfuscator binary")
+    source, err := net.ListenPacket("udp4", "127.0.0.1:0")
+    if err != nil {
+        t.Fatalf("source listen: %v", err)
     }
+    sourceAddr := source.LocalAddr().String()
+    source.Close()
 
-    let plainPacket = Data([0x01, 0x00, 0x00, 0x00]) + Data(repeating: 0x11, count: 144)
-    let targetServer = try UDPCompatibilityServer()
-    try await targetServer.start()
-
-    let sourcePort = try UDPCompatibilityPort.reserveFreePort()
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: binary)
-    process.arguments = [
-        "--source-lport=\(sourcePort)",
-        "--target=127.0.0.1:\(targetServer.port)",
+    cmd := exec.Command(binary,
+        "--source-laddr="+sourceAddr,
+        "--target="+target.LocalAddr().String(),
         "--key=shared-secret",
         "--masking=STUN",
-        "--verbose=ERRORS"
-    ]
-    try process.run()
-    defer {
-        process.terminate()
-        process.waitUntilExit()
+        "--verbose=ERRORS",
+    )
+    if err := cmd.Start(); err != nil {
+        t.Fatalf("start wg-obfuscator: %v", err)
+    }
+    defer func() {
+        _ = cmd.Process.Kill()
+        _ = cmd.Wait()
+    }()
+
+    time.Sleep(200 * time.Millisecond)
+
+    codec := NewCleanRoomCodec(Config{Enabled: true, Key: "shared-secret", Masking: MaskingSTUN, MaxDummyBytes: 0})
+    plain := append([]byte{1, 0, 0, 0}, make([]byte, 144)...)
+    encoded, err := codec.Encode(plain)
+    if err != nil {
+        t.Fatalf("encode: %v", err)
     }
 
-    try await Task.sleep(nanoseconds: 200_000_000)
-
-    let codec = WgObfuscatorCompatibleCodec(key: "shared-secret", masking: .stun, maxDummyBytes: 0)
-    let encoded = try codec.encodeOutbound(plainPacket)
-    try await UDPCompatibilityClient().send(encoded, toPort: sourcePort)
-
-    let received = try await targetServer.receive(timeout: 2.0)
-    XCTAssertEqual(received, plainPacket)
-}
-```
-
-Add these test helpers in the same file:
-
-```swift
-private enum UDPCompatibilityPort {
-    static func reserveFreePort() throws -> UInt16 {
-        let socketFD = socket(AF_INET, SOCK_DGRAM, 0)
-        guard socketFD >= 0 else { throw NSError(domain: "UDPCompatibilityPort", code: 1) }
-        defer { close(socketFD) }
-
-        var address = sockaddr_in()
-        address.sin_family = sa_family_t(AF_INET)
-        address.sin_port = 0
-        address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
-
-        let bindResult = withUnsafePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                bind(socketFD, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-            }
-        }
-        guard bindResult == 0 else { throw NSError(domain: "UDPCompatibilityPort", code: 2) }
-
-        var boundAddress = sockaddr_in()
-        var boundLength = socklen_t(MemoryLayout<sockaddr_in>.size)
-        let nameResult = withUnsafeMutablePointer(to: &boundAddress) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                getsockname(socketFD, $0, &boundLength)
-            }
-        }
-        guard nameResult == 0 else { throw NSError(domain: "UDPCompatibilityPort", code: 3) }
-        return UInt16(bigEndian: boundAddress.sin_port)
+    conn, err := net.Dial("udp4", sourceAddr)
+    if err != nil {
+        t.Fatalf("dial source: %v", err)
     }
-}
-
-private final class UDPCompatibilityServer {
-    private let listener: NWListener
-    private var continuation: CheckedContinuation<Data, Error>?
-    private(set) var port: UInt16 = 0
-
-    init() throws {
-        listener = try NWListener(using: .udp, on: 0)
+    defer conn.Close()
+    if _, err := conn.Write(encoded); err != nil {
+        t.Fatalf("write encoded: %v", err)
     }
 
-    func start() async throws {
-        listener.newConnectionHandler = { [weak self] connection in
-            connection.start(queue: .global())
-            self?.receive(on: connection)
-        }
-        listener.start(queue: .global())
-        guard let rawPort = listener.port?.rawValue else {
-            throw NSError(domain: "UDPCompatibilityServer", code: 1)
-        }
-        port = rawPort
+    buf := make([]byte, 2048)
+    _ = target.SetReadDeadline(time.Now().Add(2 * time.Second))
+    n, _, err := target.ReadFrom(buf)
+    if err != nil {
+        t.Fatalf("read target: %v", err)
     }
-
-    func receive(timeout: TimeInterval) async throws -> Data {
-        try await withThrowingTaskGroup(of: Data.self) { group in
-            group.addTask {
-                try await withCheckedThrowingContinuation { continuation in
-                    self.continuation = continuation
-                }
-            }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw NSError(domain: "UDPCompatibilityServer", code: 2)
-            }
-            let value = try await group.next()!
-            group.cancelAll()
-            return value
-        }
-    }
-
-    private func receive(on connection: NWConnection) {
-        connection.receiveMessage { [weak self] data, _, _, error in
-            if let data {
-                self?.continuation?.resume(returning: data)
-            } else {
-                self?.continuation?.resume(throwing: error ?? NSError(domain: "UDPCompatibilityServer", code: 3))
-            }
-        }
-    }
-}
-
-private final class UDPCompatibilityClient {
-    func send(_ data: Data, toPort port: UInt16) async throws {
-        let connection = NWConnection(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!, using: .udp)
-        connection.start(queue: .global())
-        try await withCheckedThrowingContinuation { continuation in
-            connection.send(content: data, completion: .contentProcessed { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-                connection.cancel()
-            })
-        }
+    if string(buf[:n]) != string(plain) {
+        t.Fatalf("forwarded packet mismatch: got %x want %x", buf[:n], plain)
     }
 }
 ```
 
-- [ ] **Step 3: Run tests to verify codec tests fail**
+- [ ] **Step 2: Run compatibility test without binary**
 
 Run:
 
 ```bash
-swift test --filter ExternalWgObfuscatorCompatibilityTests
+cd Sources/WireGuardKitGo
+go test ./obfuscator -run TestExternalWgObfuscatorAcceptsEncodedPacket
 ```
 
-Expected: FAIL because `WgObfuscatorCompatibleCodec` still throws for all packets.
+Expected: SKIP with message about `WG_OBFUSCATOR_BIN`.
 
-- [ ] **Step 4: Implement clean-room packet transform**
-
-Replace `WgObfuscatorCompatibleCodec` internals with a clean-room implementation that satisfies:
-
-```swift
-public func encodeOutbound(_ packet: Data) throws -> Data {
-    guard !packet.isEmpty else { throw ObfuscationCodecError.invalidPacket }
-    let obfuscated = xor(packet, with: keyData())
-    switch masking {
-    case .none, .auto:
-        return addHeaderAndDummy(to: obfuscated)
-    case .stun:
-        return try wrapAsStun(addHeaderAndDummy(to: obfuscated))
-    }
-}
-
-public func decodeInbound(_ packet: Data) throws -> Data {
-    let unmasked: Data
-    if looksLikeStun(packet) {
-        unmasked = try unwrapStun(packet)
-    } else if masking == .stun {
-        throw ObfuscationCodecError.invalidPacket
-    } else {
-        unmasked = packet
-    }
-    let payload = try removeHeaderAndDummy(from: unmasked)
-    return xor(payload, with: keyData())
-}
-```
-
-Implement the private helpers in the same file:
-
-```swift
-private func keyData() -> Data {
-    Data(key.utf8)
-}
-
-private func xor(_ data: Data, with key: Data) -> Data {
-    Data(data.enumerated().map { index, byte in
-        byte ^ key[index % key.count]
-    })
-}
-
-private func addHeaderAndDummy(to payload: Data) -> Data {
-    var result = Data()
-    result.append(UInt8(payload.count & 0xff))
-    result.append(UInt8((payload.count >> 8) & 0xff))
-    result.append(payload)
-    return result
-}
-
-private func removeHeaderAndDummy(from packet: Data) throws -> Data {
-    guard packet.count >= 2 else { throw ObfuscationCodecError.invalidPacket }
-    let length = Int(packet[packet.startIndex]) | (Int(packet[packet.index(after: packet.startIndex)]) << 8)
-    guard packet.count >= 2 + length else { throw ObfuscationCodecError.invalidPacket }
-    return packet.dropFirst(2).prefix(length)
-}
-
-private func looksLikeStun(_ packet: Data) -> Bool {
-    packet.count >= 20 &&
-        packet[packet.startIndex] == 0x00 &&
-        packet[packet.index(after: packet.startIndex)] == 0x01 &&
-        packet.dropFirst(4).prefix(4) == Data([0x21, 0x12, 0xA4, 0x42])
-}
-
-private func wrapAsStun(_ payload: Data) throws -> Data {
-    guard payload.count <= UInt16.max else { throw ObfuscationCodecError.invalidPacket }
-    var packet = Data([0x00, 0x01])
-    packet.append(UInt8(payload.count >> 8))
-    packet.append(UInt8(payload.count & 0xff))
-    packet.append(Data([0x21, 0x12, 0xA4, 0x42]))
-    packet.append(Data(repeating: 0x00, count: 12))
-    packet.append(payload)
-    return packet
-}
-
-private func unwrapStun(_ packet: Data) throws -> Data {
-    guard looksLikeStun(packet) else { throw ObfuscationCodecError.invalidPacket }
-    let lengthIndex = packet.index(packet.startIndex, offsetBy: 2)
-    let length = (Int(packet[lengthIndex]) << 8) | Int(packet[packet.index(after: lengthIndex)])
-    guard packet.count >= 20 + length else { throw ObfuscationCodecError.invalidPacket }
-    return packet.dropFirst(20).prefix(length)
-}
-```
-
-This is the first clean-room codec skeleton. The external harness must fail until the codec is adjusted to match observed upstream behavior. Make adjustments from black-box observations and packet captures, not copied upstream source.
-
-- [ ] **Step 5: Run internal codec tests**
+- [ ] **Step 3: Run compatibility test with upstream binary**
 
 Run:
 
 ```bash
-swift test --filter ExternalWgObfuscatorCompatibilityTests/testNoneModeRoundTrip
-swift test --filter ExternalWgObfuscatorCompatibilityTests/testCodecRejectsInvalidPackets
+cd Sources/WireGuardKitGo
+WG_OBFUSCATOR_BIN=/absolute/path/to/wg-obfuscator go test ./obfuscator -run TestExternalWgObfuscatorAcceptsEncodedPacket -count=1
 ```
 
-Expected: PASS.
+Expected: FAIL until `CleanRoomCodec` matches upstream behavior.
 
-- [ ] **Step 6: Run external compatibility test when binary is available**
+- [ ] **Step 4: Iterate codec from black-box observations**
 
-Build upstream outside this repo, then run:
+Modify `Sources/WireGuardKitGo/obfuscator/codec.go` only from observed packet behavior and generated vectors. Keep the public methods:
+
+```go
+func (c *CleanRoomCodec) Encode(packet []byte) ([]byte, error)
+func (c *CleanRoomCodec) Decode(packet []byte) ([]byte, error)
+```
+
+The compatibility gate is:
 
 ```bash
-WG_OBFUSCATOR_BIN=/absolute/path/to/wg-obfuscator swift test --filter ExternalWgObfuscatorCompatibilityTests
+WG_OBFUSCATOR_BIN=/absolute/path/to/wg-obfuscator go test ./obfuscator -run TestExternalWgObfuscatorAcceptsEncodedPacket -count=1
 ```
 
-Expected: PASS against upstream v1.5 before the feature is considered compatible. If it fails, keep iterating on the clean-room codec until this test passes.
+Expected after iteration: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 5: Commit**
 
 Run:
 
 ```bash
-git add Package.swift Sources/WireGuardKitObfuscator/ObfuscationCodec.swift Tests/WireGuardKitObfuscatorCompatibilityTests
-git commit -m "feat: add obfuscation codec compatibility boundary"
+git add Sources/WireGuardKitGo/obfuscator/codec.go Sources/WireGuardKitGo/obfuscator/compat_test.go
+git commit -m "feat: verify obfuscation codec compatibility"
 ```
 
-## Task 8: Add Xcode Project Integration
+## Task 9: Xcode Project Integration
 
 **Files:**
 - Modify: `WireGuard.xcodeproj/project.pbxproj`
 
-- [ ] **Step 1: Open project file status**
+- [ ] **Step 1: Add Swift source files to Xcode project**
 
-Run:
-
-```bash
-git status --short WireGuard.xcodeproj/project.pbxproj
-```
-
-Expected: no output before editing.
-
-- [ ] **Step 2: Add new files to project**
-
-Using Xcode project editing or a deterministic pbxproj editor, add these files to the appropriate groups and targets:
+Add these files to the project:
 
 ```text
 Sources/WireGuardKitTypes/ObfuscationConfiguration.swift
-Sources/WireGuardKit/ObfuscationRuntime.swift
-Sources/WireGuardKitObfuscator/ObfuscationCodec.swift
-Sources/WireGuardKitObfuscator/ObfuscationSession.swift
-Sources/WireGuardKitObfuscator/ObfuscationSessionFactory.swift
+Sources/WireGuardKit/ObfuscationRouteExclusion.swift
 ```
 
 Target membership:
 
 ```text
 WireGuardKitTypes -> ObfuscationConfiguration.swift
-WireGuardKit -> ObfuscationRuntime.swift
-WireGuardKitObfuscator -> ObfuscationCodec.swift, ObfuscationSession.swift, ObfuscationSessionFactory.swift
-WireGuardNetworkExtension -> links WireGuardKitObfuscator through WireGuardKit
+WireGuardKit -> ObfuscationRouteExclusion.swift
 ```
 
-- [ ] **Step 3: Verify project file changed only for target membership**
+- [ ] **Step 2: Verify project file diff**
 
 Run:
 
@@ -1682,43 +1512,47 @@ Run:
 git diff -- WireGuard.xcodeproj/project.pbxproj
 ```
 
-Expected: new file references, build file entries, group entries, and target source build phase entries only.
+Expected: file references, group entries, and source build phase entries for only the two new Swift files.
 
-- [ ] **Step 4: Build package**
-
-Run:
-
-```bash
-swift build
-```
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 Run:
 
 ```bash
 git add WireGuard.xcodeproj/project.pbxproj
-git commit -m "build: add obfuscator sources to xcode project"
+git commit -m "build: add obfuscation swift sources"
 ```
 
-## Task 9: Final Verification
+## Task 10: Final Verification
 
 **Files:**
 - No new files.
 
-- [ ] **Step 1: Run Swift tests**
+- [ ] **Step 1: Run Swift focused tests**
 
 Run:
 
 ```bash
-swift test
+swift test --filter ObfuscationConfigurationTests
+swift test --filter ObfuscationProviderCodingTests
+swift test --filter ObfuscationRouteExclusionTests
 ```
 
 Expected: PASS.
 
-- [ ] **Step 2: Run SwiftLint**
+- [ ] **Step 2: Run Go focused tests**
+
+Run:
+
+```bash
+cd Sources/WireGuardKitGo
+go test ./obfuscator
+go test ./... -run 'TestMaybeObfuscatingBind|TestConfigValidate|TestBind'
+```
+
+Expected: PASS.
+
+- [ ] **Step 3: Run lint**
 
 Run:
 
@@ -1726,39 +1560,9 @@ Run:
 swiftlint
 ```
 
-Expected: PASS or only pre-existing warnings unrelated to files changed in this plan.
+Expected: PASS or only pre-existing warnings outside files changed by this plan.
 
-- [ ] **Step 3: List Xcode schemes**
-
-Run:
-
-```bash
-xcodebuild -project WireGuard.xcodeproj -list
-```
-
-Expected: command prints available schemes. Pick the iOS and macOS app or extension scheme names from this output.
-
-- [ ] **Step 4: Build macOS target**
-
-Run with the scheme discovered in Step 3:
-
-```bash
-xcodebuild -project WireGuard.xcodeproj -scheme WireGuard -configuration Debug build
-```
-
-Expected: PASS, or a signing/developer-team error only. If signing fails, confirm compilation reached code signing and record the signing error in the final handoff.
-
-- [ ] **Step 5: Build iOS target**
-
-Run with the iOS scheme discovered in Step 3:
-
-```bash
-xcodebuild -project WireGuard.xcodeproj -scheme WireGuard -configuration Debug -sdk iphonesimulator build
-```
-
-Expected: PASS, or a signing/developer-team error only. If signing fails, confirm compilation reached code signing and record the signing error in the final handoff.
-
-- [ ] **Step 6: Check whitespace**
+- [ ] **Step 4: Run whitespace check**
 
 Run:
 
@@ -1768,28 +1572,53 @@ git diff --check
 
 Expected: no output.
 
-- [ ] **Step 7: Commit final fixes**
+- [ ] **Step 5: Build package**
 
-If verification required fixes:
+Run:
 
 ```bash
-git add <fixed-files>
-git commit -m "fix: stabilize obfuscation integration"
+swift build
 ```
 
-If no fixes were needed, do not create an empty commit.
+Expected: PASS.
+
+- [ ] **Step 6: Build Go archive**
+
+Run:
+
+```bash
+make -C Sources/WireGuardKitGo build
+```
+
+Expected: PASS. If toolchain dependencies are missing, record exact missing tool output.
+
+- [ ] **Step 7: Build Xcode scheme**
+
+Run:
+
+```bash
+xcodebuild -project WireGuard.xcodeproj -list
+```
+
+Then run the available app or network extension scheme:
+
+```bash
+xcodebuild -project WireGuard.xcodeproj -scheme WireGuard -configuration Debug build
+```
+
+Expected: PASS, or a signing/developer-team error after compilation reaches code signing.
 
 ## Self-Review
 
 - Spec coverage:
-  - Embedded in-process session: Tasks 4 and 5.
-  - Endpoint rewrite to loopback: Task 3.
-  - utun loop prevention through excluded route: Tasks 3 and 6.
-  - Provider metadata outside wg-quick: Task 2.
-  - IPv4-only first implementation: Tasks 3 and 5.
-  - One obfuscated peer: Task 5.
-  - External compatibility boundary: Task 7.
-- Placeholder scan:
-  - No blank requirement markers or empty implementation steps remain.
+  - Bind-wrapper architecture: Tasks 4, 5, and 6.
+  - No loopback endpoint rewrite: Task 3 tests UAPI keeps the real endpoint.
+  - Single-hop physical transport: Task 6 wraps `StdNetBind`.
+  - Multihop physical entry leg: Task 6 wraps entry `StdNetBind` and leaves `singletun.Binder()` unchanged.
+  - Route hardening: Tasks 3 and 7.
+  - Metadata outside wg-quick: Task 2.
+  - Codec compatibility: Task 8.
+- Red-flag scan:
+  - No blank requirement markers, empty test steps, or unspecified implementation tasks remain.
 - Type consistency:
-  - `ObfuscationConfiguration`, `PeerObfuscationConfiguration`, `ObfuscationRuntime`, `ObfuscationPacketCodec`, `ObfuscationSession`, and `ObfuscationSessionFactory` names are consistent across tasks.
+  - `ObfuscationConfiguration`, `PeerObfuscationConfiguration`, `ObfuscationRouteExclusion`, `obfuscator.Config`, `obfuscator.Bind`, and `CleanRoomCodec` are used consistently.
