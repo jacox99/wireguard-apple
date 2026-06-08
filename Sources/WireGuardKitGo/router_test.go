@@ -609,7 +609,7 @@ func TestRapidShutdown(t *testing.T) {
 	for i := 0; i < 3000; i += 1 {
 		aIp := netip.AddrFrom4([4]byte{1, 2, 3, 4})
 		a, _, _ := netstack.CreateNetTUN([]netip.Addr{aIp}, []netip.Addr{}, 1280)
-		tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil)
+		tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil, "")
 		_ = wgOpenInTunnelTCP(tunnel, cstring(remoteAddr), 1)
 		wgTurnOff(tunnel)
 	}

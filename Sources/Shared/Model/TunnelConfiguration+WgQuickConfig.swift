@@ -28,6 +28,9 @@ extension TunnelConfiguration {
         case peerHasInvalidAllowedIP(String)
         case peerHasInvalidEndpoint(String)
         case peerHasInvalidPersistentKeepAlive(String)
+        case peerHasInvalidObfuscationKey(String)
+        case peerHasInvalidObfuscationMasking(String)
+        case peerHasInvalidObfuscationMaxDummy(String)
         case peerHasInvalidTransferBytes(String)
         case peerHasInvalidLastHandshakeTime(String)
         case peerHasUnrecognizedKey(String)
@@ -72,7 +75,7 @@ extension TunnelConfiguration {
                         attributes[key] = value
                     }
                     let interfaceSectionKeys: Set<String> = ["privatekey", "listenport", "address", "dns", "mtu"]
-                    let peerSectionKeys: Set<String> = ["publickey", "presharedkey", "allowedips", "endpoint", "persistentkeepalive"]
+                    let peerSectionKeys: Set<String> = ["publickey", "presharedkey", "allowedips", "endpoint", "persistentkeepalive", "obfuscationkey", "obfuscationmasking", "obfuscationmaxdummy"]
                     if parserState == .inInterfaceSection {
                         guard interfaceSectionKeys.contains(key) else {
                             throw ParseError.interfaceHasUnrecognizedKey(keyWithCase)
@@ -158,6 +161,15 @@ extension TunnelConfiguration {
             }
             if let persistentKeepAlive = peer.persistentKeepAlive {
                 output.append("PersistentKeepalive = \(persistentKeepAlive)\n")
+            }
+            if let obfuscationKey = peer.obfuscationKey {
+                output.append("ObfuscationKey = \(obfuscationKey)\n")
+                if peer.obfuscationMasking != .none {
+                    output.append("ObfuscationMasking = \(peer.obfuscationMasking.rawValue.uppercased())\n")
+                }
+                if let obfuscationMaxDummy = peer.obfuscationMaxDummy {
+                    output.append("ObfuscationMaxDummy = \(obfuscationMaxDummy)\n")
+                }
             }
         }
 
@@ -245,6 +257,24 @@ extension TunnelConfiguration {
                 throw ParseError.peerHasInvalidPersistentKeepAlive(persistentKeepAliveString)
             }
             peer.persistentKeepAlive = persistentKeepAlive
+        }
+        if let obfuscationKey = attributes["obfuscationkey"] {
+            guard !obfuscationKey.isEmpty && obfuscationKey.utf8.count <= 255 else {
+                throw ParseError.peerHasInvalidObfuscationKey(obfuscationKey)
+            }
+            peer.obfuscationKey = obfuscationKey
+        }
+        if let obfuscationMaskingString = attributes["obfuscationmasking"] {
+            guard let obfuscationMasking = ObfuscationMasking(rawValue: obfuscationMaskingString.lowercased()) else {
+                throw ParseError.peerHasInvalidObfuscationMasking(obfuscationMaskingString)
+            }
+            peer.obfuscationMasking = obfuscationMasking
+        }
+        if let obfuscationMaxDummyString = attributes["obfuscationmaxdummy"] {
+            guard let obfuscationMaxDummy = UInt16(obfuscationMaxDummyString), obfuscationMaxDummy <= 1024 else {
+                throw ParseError.peerHasInvalidObfuscationMaxDummy(obfuscationMaxDummyString)
+            }
+            peer.obfuscationMaxDummy = obfuscationMaxDummy
         }
         return peer
     }

@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Публичный ключ";
 "tunnelPeerPreSharedKey" = "Общий ключ";
 "tunnelPeerEndpoint" = "IP-адрес сервера";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Поддерживание соединения";
 "tunnelPeerAllowedIPs" = "Разрешенные IP-адреса";
 "tunnelPeerRxBytes" = "Получено данных";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Разрешенные IP-адреса пиров должны быть списком, разделенные запятыми, желательно с комментариями CIDR";
 "alertInvalidPeerMessageEndpointInvalid" = "IP-адрес сервера должен быть в формате ’host:port’ или ’[host]:port’";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Значение поддерживания соединения пира должно быть от 0 до 65535, или не указано";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Два или более пиров не могут иметь один и тот же публичный ключ";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "Разрешенный IP-адрес ‘%@’ недопустим";
 "macAlertEndpointInvalid (%@)" = "IP-адрес сервера ’%@’ недопустим";
 "macAlertPersistentKeepliveInvalid (%@)" = "Значение поддерживания соединения ‘%@’ недопустимо";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Пир содержит нераспознанный ключ ‘%@’";
-"macAlertInfoUnrecognizedPeerKey" = "Допустимые ключи: «Публичный ключ», «Общий ключ», «Разрешенные IP-адреса», «IP-адрес сервера» и «Поддерживание соединения»";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "В секции пира должна быть только одна запись ключа ‘%@’";
 

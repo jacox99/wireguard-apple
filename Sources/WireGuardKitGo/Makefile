@@ -34,7 +34,7 @@ ifeq ($(UNAME), $(GOARCH_arm64))
 	GOOS_iphonesimulator := ios
 endif
 
-build: $(DESTDIR)/libwg-go.a
+build: $(DESTDIR)/libwg-go.a $(DESTDIR)/libmaybenot.a
 version-header: $(DESTDIR)/wireguard-go-version.h
 
 REAL_GOROOT := $(shell go env GOROOT 2>/dev/null)
@@ -46,20 +46,27 @@ $(GOROOT)/.prepared:
 	cat goruntime-*.diff | patch -p1 -f -N -r- -d "$(GOROOT)"
 	touch "$@"
 
+define libmaybenot-a
+$(BUILDDIR)/libmaybenot-$(1).a:
+	git submodule update --init --recursive
+	@mkdir -p "$(BUILDDIR)/maybenot-$(1)"
+	CARGO_TARGET_DIR="$(BUILDDIR)/target" \
+			DESTINATION="$(BUILDDIR)/maybenot-$(1)" \
+			PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin:" \
+			CARGO="$(HOME)/.cargo/bin/cargo" \
+			TARGET=$(RUST_$(1))-apple-$(RUST_TARGET_$(PLATFORM_NAME)) \
+			make -C wireguard-go/maybenot/crates/maybenot-ffi
+	cp "$(BUILDDIR)/maybenot-$(1)/libmaybenot.a" "$$@"
+endef
+$(foreach ARCH,$(ARCHS),$(eval $(call libmaybenot-a,$(ARCH))))
+
 define libwg-go-a
 $(BUILDDIR)/libwg-go-$(1).a: export CGO_ENABLED := 1
 $(BUILDDIR)/libwg-go-$(1).a: export CGO_CFLAGS := $(CFLAGS_PREFIX) $(ARCH)
 $(BUILDDIR)/libwg-go-$(1).a: export CGO_LDFLAGS := $(CFLAGS_PREFIX) $(ARCH)
 $(BUILDDIR)/libwg-go-$(1).a: export GOOS := $(GOOS_$(PLATFORM_NAME))
 $(BUILDDIR)/libwg-go-$(1).a: export GOARCH := $(GOARCH_$(1))
-$(BUILDDIR)/libwg-go-$(1).a: $(GOROOT)/.prepared go.mod
-	git submodule update --init --recursive
-	CARGO_TARGET_DIR="$(BUILDDIR)/target" \
-			DESTINATION="$(BUILT_PRODUCTS_DIR)" \
-			PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin:" \
-			CARGO="$(HOME)/.cargo/bin/cargo" \
-			TARGET=$(RUST_$(1))-apple-$(RUST_TARGET_$(PLATFORM_NAME)) \
-			make -C wireguard-go/maybenot/crates/maybenot-ffi
+$(BUILDDIR)/libwg-go-$(1).a: $(GOROOT)/.prepared go.mod $(BUILDDIR)/libmaybenot-$(1).a
 	go build --tags daita -ldflags=-w -trimpath -ldflags=L=$(BUILDDIR)/ -v -o "$(BUILDDIR)/libwg-go-$(1).a" -buildmode c-archive
 	rm -f "$(BUILDDIR)/libwg-go-$(1).h"
 endef
@@ -72,8 +79,12 @@ $(DESTDIR)/libwg-go.a: $(foreach ARCH,$(ARCHS),$(BUILDDIR)/libwg-go-$(ARCH).a)
 	@mkdir -vp "$(DESTDIR)"
 	$(LIPO) -create -output "$@" $^
 
+$(DESTDIR)/libmaybenot.a: $(foreach ARCH,$(ARCHS),$(BUILDDIR)/libmaybenot-$(ARCH).a)
+	@mkdir -vp "$(DESTDIR)"
+	$(LIPO) -create -output "$@" $^
+
 clean:
-	rm -rf "$(BUILDDIR)" "$(DESTDIR)/libwg-go.a" "$(DESTDIR)/wireguard-go-version.h"
+	rm -rf "$(BUILDDIR)" "$(DESTDIR)/libwg-go.a" "$(DESTDIR)/libmaybenot.a" "$(DESTDIR)/wireguard-go-version.h"
 	rm -f libmaybenot.a
 	rm -rf $(CONFIGURATION_BUILD_DIR)
 	make -C wireguard-go clean

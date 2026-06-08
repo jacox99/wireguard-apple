@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Javni ključ";
 "tunnelPeerPreSharedKey" = "Ključ v skupni rabi";
 "tunnelPeerEndpoint" = "Končna točka";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Trajno ohranjanje povezave";
 "tunnelPeerAllowedIPs" = "Dovoljeni IP-ji";
 "tunnelPeerRxBytes" = "Prejeti podatki";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Omrežni naslovi vrstnika morajo biti v seznamu ločeni z vejico, izbirno v zapisu CIDR";
 "alertInvalidPeerMessageEndpointInvalid" = "Končna točka vrstnika mora biti v obliki 'gostitelj:vrata' ali '[gostitelj]:vrata'";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Trajno ohranjanje povezave vrstnika mora biti med 0 in 65535, ali nedoločeno";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Dva ali več vrstnikov ne more imeti enakega javnega ključa";
 
 // Scanning QR code UI
@@ -387,6 +393,9 @@
 "macAlertPersistentKeepliveInvalid (%@)" = "Vrednost \"%@\" za trajno ohranjanje povezave ni veljavna";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Vrstnik vsebuje neprepoznan ključ \"%@\"";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 "macAlertInfoUnrecognizedPeerKey" = "Veljavna polja so: \"PublicKey\", \"PresharedKey\", \"AllowedIPs\", \"Endpoint\" in \"PersistentKeepalive\"";
 
 "macAlertMultipleEntriesForKey (%@)" = "Obstajati bi moral samo en vnos na odsek za ključ \"%@\"";

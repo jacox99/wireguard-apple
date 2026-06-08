@@ -50,26 +50,29 @@ func (h *tunnelHandles) Remove(idx int32) *tunnelHandle {
 
 type tunnelHandle struct {
 	// A WireGuard device for the exit relay.
-	exit          *device.Device
+	exit *device.Device
 	// A WireGuard device for the entry relay.
-	entry         *device.Device
+	entry *device.Device
 	// A logger.
-	logger        *device.Logger
+	logger *device.Logger
 	// A virtual network used to send traffic to the exit relay.
-	VirtualNet    *netstack.Net
+	VirtualNet *netstack.Net
 	// Socket handles that are attached to the virtual network.
 	socketHandles map[int32]*socketHandle
+	// Optional obfuscation wrapper attached to the exit device's real UDP bind.
+	obfuscation *obfuscatingBind
 	// A lock to be held when mutating this struct.
-	lock          *sync.Mutex
+	lock *sync.Mutex
 }
 
-func NewTunnelHandle(exit *device.Device, entry *device.Device, logger *device.Logger, virtualNet *netstack.Net) tunnelHandle {
+func NewTunnelHandle(exit *device.Device, entry *device.Device, logger *device.Logger, virtualNet *netstack.Net, obfuscation *obfuscatingBind) tunnelHandle {
 	return tunnelHandle{
 		exit:          exit,
 		entry:         entry,
 		logger:        logger,
 		VirtualNet:    virtualNet,
 		socketHandles: make(map[int32]*socketHandle),
+		obfuscation:   obfuscation,
 		lock:          &sync.Mutex{},
 	}
 }
@@ -93,6 +96,15 @@ func (tun *tunnelHandle) SetConfig(settings string) int64 {
 		return errBadWgConfig
 	}
 	return 0
+}
+
+func (tun *tunnelHandle) SetObfuscationConfig(settings string) {
+	if tun.obfuscation == nil {
+		return
+	}
+	if err := tun.obfuscation.Configure(settings); err != nil {
+		tun.logger.Errorf("Unable to set obfuscation settings: %v", err)
+	}
 }
 
 func (tun *tunnelHandle) BumpSockets() {
@@ -172,7 +184,6 @@ func (tun *tunnelHandle) Close() {
 	tun.lock.Lock()
 	defer tun.lock.Unlock()
 
-
 	for _, socket := range tun.socketHandles {
 		socket.close()
 	}
@@ -192,13 +203,13 @@ type socketHandle struct {
 	// whilst it is trying to create a TCP connection to our relay.
 	initializingLock *sync.Mutex
 	// Underlying connection
-	conn             net.Conn
+	conn net.Conn
 	// Error returned when connection fails to initialize
-	connError        error
+	connError error
 
 	// Cancel function is returned by `context.WithCancel`. This should cancel
 	// any initialization of a socket.
-	cancelFunc       func()
+	cancelFunc func()
 }
 
 // Creates a new socket handle for a connection and spawns off a goroutine initializing the connection.
@@ -228,8 +239,8 @@ func newSocketHandle(vnet *netstack.Net, ctx context.Context, createSocket func(
 
 func (handle *socketHandle) close() {
 	handle.cancelFunc()
-	handle.initializingLock.Lock() 
-	defer handle.initializingLock.Unlock() 
+	handle.initializingLock.Lock()
+	defer handle.initializingLock.Unlock()
 	if handle.conn != nil {
 		handle.conn.Close()
 	}

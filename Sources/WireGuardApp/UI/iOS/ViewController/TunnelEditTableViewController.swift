@@ -39,6 +39,7 @@ class TunnelEditTableViewController: UITableViewController {
 
     let peerFields: [TunnelViewModel.PeerField] = [
         .publicKey, .preSharedKey, .endpoint,
+        .obfuscationKey, .obfuscationMasking, .obfuscationMaxDummy,
         .allowedIPs, .excludePrivateIPs, .persistentKeepAlive,
         .deletePeer
     ]
@@ -356,9 +357,12 @@ extension TunnelEditTableViewController {
         case .publicKey:
             cell.placeholderText = tr("tunnelEditPlaceholderTextRequired")
             cell.keyboardType = .default
-        case .preSharedKey, .endpoint:
+        case .preSharedKey, .endpoint, .obfuscationKey, .obfuscationMasking:
             cell.placeholderText = tr("tunnelEditPlaceholderTextOptional")
             cell.keyboardType = .default
+        case .obfuscationMaxDummy:
+            cell.placeholderText = tr("tunnelEditPlaceholderTextOptional")
+            cell.keyboardType = .numberPad
         case .allowedIPs:
             cell.placeholderText = tr("tunnelEditPlaceholderTextOptional")
             cell.keyboardType = .numbersAndPunctuation

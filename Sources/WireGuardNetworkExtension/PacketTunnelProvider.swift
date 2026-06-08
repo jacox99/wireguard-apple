@@ -62,6 +62,26 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
                 completionHandler(PacketTunnelProviderError.couldNotStartBackend)
 
+            case .noSuchTunnel:
+                wg_log(.error, staticMessage: "Starting tunnel failed: tunnel descriptor is not open")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
+            case .noTunnelVirtualInterface:
+                wg_log(.error, staticMessage: "Starting tunnel failed: tunnel virtual interface is unavailable")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
+            case .icmpSocketNotOpen:
+                wg_log(.error, staticMessage: "Starting tunnel failed: ICMP socket is not open")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
+            case .internalError(let errorCode):
+                wg_log(.error, message: "Starting tunnel failed with internal adapter error \(errorCode)")
+                errorNotifier.notify(PacketTunnelProviderError.couldNotStartBackend)
+                completionHandler(PacketTunnelProviderError.couldNotStartBackend)
+
             case .invalidState:
                 // Must never happen
                 fatalError()

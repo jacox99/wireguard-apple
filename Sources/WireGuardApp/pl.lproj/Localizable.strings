@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Klucz publiczny";
 "tunnelPeerPreSharedKey" = "PSK";
 "tunnelPeerEndpoint" = "Adres";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Utrzymanie połączenia";
 "tunnelPeerAllowedIPs" = "Dozwolone adresy IP";
 "tunnelPeerRxBytes" = "Otrzymane dane";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Dozwolone adresy peer'a muszą być listą adresów IP rozdzielone przecinkami, opcjonalnie w notacji CIDR";
 "alertInvalidPeerMessageEndpointInvalid" = "Adres peer'a musi być w postaci „adres:port” or „[host]:port”";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Interwał podtrzymywania połączenia musi wynosić pomiędzy 0 a 65535 lub nieokreślony";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Dwa lub więcej peer'ów nie może współdzielić tego samego klucza publicznego";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "Dozwolony adres IP „%@” jest nieprawidłowy";
 "macAlertEndpointInvalid (%@)" = "Adres końcowy „%@” jest nieprawidłowy";
 "macAlertPersistentKeepliveInvalid (%@)" = "Obecna wartość keepalive „%@” jest nieprawidłowa";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Peer zawiera nierozpoznawalny klucz „%@”";
-"macAlertInfoUnrecognizedPeerKey" = "Prawidłowe klucze to: „PublicKey”, „PresharedKey”, „AllowedIPs”, „Endpoint” i „PersistentKeepalive”";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "Dla klucza „%@” powinien być tylko jeden wpis w sekcji";
 

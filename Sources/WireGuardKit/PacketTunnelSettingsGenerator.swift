@@ -101,6 +101,27 @@ struct DeviceConfiguration {
         return (wgSettings, resolutionResults)
     }
 
+    func obfuscationConfiguration(effectiveEndpoints: [Endpoint?]? = nil) -> String {
+        var obfuscationSettings = ""
+        let endpoints = effectiveEndpoints ?? resolvedEndpoints
+
+        assert(configuration.peers.count == endpoints.count)
+        for (peer, endpoint) in zip(configuration.peers, endpoints) {
+            guard let key = peer.obfuscationKey else { continue }
+
+            guard let endpoint else { continue }
+            obfuscationSettings.append("endpoint=\(endpoint.stringRepresentation)\n")
+            obfuscationSettings.append("key=\(key)\n")
+            obfuscationSettings.append("masking=\(peer.obfuscationMasking.rawValue)\n")
+            if let obfuscationMaxDummy = peer.obfuscationMaxDummy {
+                obfuscationSettings.append("max_dummy=\(obfuscationMaxDummy)\n")
+            }
+            obfuscationSettings.append("\n")
+        }
+
+        return obfuscationSettings
+    }
+
     private func addresses() -> ([NEIPv4Route], [NEIPv6Route]) {
         var ipv4Routes = [NEIPv4Route]()
         var ipv6Routes = [NEIPv6Route]()
@@ -156,9 +177,16 @@ struct DeviceConfiguration {
 }
 
 class PacketTunnelSettingsGenerator {
+    private struct EndpointUapiResult {
+        let wgSettings: String
+        let resolutionResults: [EndpointResolutionResult?]
+        let effectiveEndpoints: [Endpoint?]
+    }
+
     let exit: DeviceConfiguration
     let entry: DeviceConfiguration?
     let daita: DaitaConfiguration?
+    private var exitEffectiveEndpoints: [Endpoint?]?
 
     init(exit: DeviceConfiguration, entry: DeviceConfiguration? = nil, daita: DaitaConfiguration? = nil) {
         self.exit = exit
@@ -168,13 +196,14 @@ class PacketTunnelSettingsGenerator {
 
     func entryUapiConfiguration() -> (String, [EndpointResolutionResult?])? {
         if let entry {
-            uapiConfiguration(for: entry)
+            uapiConfiguration(for: entry, cacheExitEndpoints: false)
         } else {
             nil
         }
     }
 
-    private func uapiConfiguration(for device: DeviceConfiguration) -> (String, [EndpointResolutionResult?]) {
+    private func uapiConfiguration(for device: DeviceConfiguration, cacheExitEndpoints: Bool) -> (String, [EndpointResolutionResult?]) {
+        var effectiveEndpoints = [Endpoint?]()
         var resolutionResults = [EndpointResolutionResult?]()
         var wgSettings = ""
         wgSettings.append("private_key=\(device.configuration.interface.privateKey.hexKey)\n")
@@ -196,12 +225,16 @@ class PacketTunnelSettingsGenerator {
                 if case .success((_, let resolvedEndpoint)) = result {
                     if case .name = resolvedEndpoint.host { assert(false, "Endpoint is not resolved") }
                     wgSettings.append("endpoint=\(resolvedEndpoint.stringRepresentation)\n")
+                    effectiveEndpoints.append(resolvedEndpoint)
+                } else {
+                    effectiveEndpoints.append(nil)
                 }
                 resolutionResults.append(result)
             } else {
                 resolvedEndpoint.map {
                     wgSettings.append("endpoint=\($0.stringRepresentation)\n")
                 }
+                effectiveEndpoints.append(resolvedEndpoint)
             }
 
             let persistentKeepAlive = peer.persistentKeepAlive ?? 0
@@ -211,11 +244,14 @@ class PacketTunnelSettingsGenerator {
                 peer.allowedIPs.forEach { wgSettings.append("allowed_ip=\($0.stringRepresentation)\n") }
             }
         }
+        if cacheExitEndpoints {
+            exitEffectiveEndpoints = effectiveEndpoints
+        }
         return (wgSettings, resolutionResults)
 
     }
     func uapiConfiguration() -> (String, [EndpointResolutionResult?]) {
-        uapiConfiguration(for: self.exit)
+        uapiConfiguration(for: self.exit, cacheExitEndpoints: true)
    }
 
     func generateNetworkSettings() -> NEPacketTunnelNetworkSettings {
@@ -223,11 +259,47 @@ class PacketTunnelSettingsGenerator {
     }
 
     func endpointUapiConfiguration() -> (String, [EndpointResolutionResult?]) {
-        exit.endpointUapiConfiguration()
+        let result = endpointUapiConfiguration(for: self.exit)
+        exitEffectiveEndpoints = result.effectiveEndpoints
+        return (result.wgSettings, result.resolutionResults)
     }
 
     func entryEndpointUapiConfiguration() -> (String, [EndpointResolutionResult?])? {
         entry?.endpointUapiConfiguration()
+    }
+
+    func obfuscationConfiguration() -> String {
+        exit.obfuscationConfiguration(effectiveEndpoints: exitEffectiveEndpoints)
+    }
+
+    private func endpointUapiConfiguration(for device: DeviceConfiguration) -> EndpointUapiResult {
+        var resolutionResults = [EndpointResolutionResult?]()
+        var effectiveEndpoints = [Endpoint?]()
+        var wgSettings = ""
+
+        assert(device.configuration.peers.count == device.resolvedEndpoints.count)
+        for (peer, resolvedEndpoint) in zip(device.configuration.peers, device.resolvedEndpoints) {
+            wgSettings.append("public_key=\(peer.publicKey.hexKey)\n")
+
+            if device.reResolveEndpoint {
+                let result = resolvedEndpoint.map(Self.reresolveEndpoint)
+                if case .success((_, let resolvedEndpoint)) = result {
+                    if case .name = resolvedEndpoint.host { assert(false, "Endpoint is not resolved") }
+                    wgSettings.append("endpoint=\(resolvedEndpoint.stringRepresentation)\n")
+                    effectiveEndpoints.append(resolvedEndpoint)
+                } else {
+                    effectiveEndpoints.append(nil)
+                }
+                resolutionResults.append(result)
+            } else {
+                resolvedEndpoint.map {
+                    wgSettings.append("endpoint=\($0.stringRepresentation)\n")
+                }
+                effectiveEndpoints.append(resolvedEndpoint)
+            }
+        }
+
+        return EndpointUapiResult(wgSettings: wgSettings, resolutionResults: resolutionResults, effectiveEndpoints: effectiveEndpoints)
     }
 
     class fileprivate func reresolveEndpoint(endpoint: Endpoint) -> EndpointResolutionResult {

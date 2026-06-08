@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Cléf public";
 "tunnelPeerPreSharedKey" = "Clef prépartagée";
 "tunnelPeerEndpoint" = "Point de terminaison";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Garde en vie persistante";
 "tunnelPeerAllowedIPs" = "Adresses IP autorisées";
 "tunnelPeerRxBytes" = "Données reçues";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Les adresses IP autorisées par le pair doivent être une liste d'adresses IP séparées par des virgules, éventuellement dans la notation CIDR";
 "alertInvalidPeerMessageEndpointInvalid" = "Le point de terminaison du pair doit être de la forme « host:port» ou «[host]:port»";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Le maintien persistant du pair doit être compris entre 0 et 65535, ou non spécifié";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Deux ou plusieurs pairs ne peuvent pas avoir la même clef publique";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "L'adresse IP autorisée ‘%@’ est invalide";
 "macAlertEndpointInvalid (%@)" = "Le point de terminaison ‘%@’ est invalide";
 "macAlertPersistentKeepliveInvalid (%@)" = "La valeur du Keepalive persistant ‘%@’ est invalide";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Le pair contient une clef «%@» non reconnue";
-"macAlertInfoUnrecognizedPeerKey" = "Les clefs valides sont : ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ and ‘PersistentKeepalive’";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "Il ne devrait y avoir qu'une seule entrée par section pour la clef ‘%@’";
 

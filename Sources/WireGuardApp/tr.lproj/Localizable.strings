@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Genel anahtar";
 "tunnelPeerPreSharedKey" = "Önceden paylaşılan anahtar";
 "tunnelPeerEndpoint" = "Uç nokta";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Kalıcı canlı tutma";
 "tunnelPeerAllowedIPs" = "İzin verilen IP’ler";
 "tunnelPeerRxBytes" = "Veri alındı";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Eşlerin izin verilen IP’leri, isteğe bağlı olarak CIDR gösteriminde virgülle ayrılmış IP adreslerinin bir listesi olmalıdır";
 "alertInvalidPeerMessageEndpointInvalid" = "Eşin uç noktası \"host:port\" veya \"[host]: port\" biçiminde olmalıdır";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Eşin sürekli canlı tutulması 0 ile 65535 arasında veya belirtilmemiş olmalıdır";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "İki veya daha fazla eş aynı ortak anahtara sahip olamaz";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "İzin verilen IP ‘%@’ geçersiz";
 "macAlertEndpointInvalid (%@)" = "‘%@’ uç noktası geçersiz";
 "macAlertPersistentKeepliveInvalid (%@)" = "Sürekli canlı tutma değeri ‘%@’ geçersiz";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Eş tanınmayan ‘%@’ anahtarı içeriyor";
-"macAlertInfoUnrecognizedPeerKey" = "Geçerli anahtarlar şunlardır: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ ve ‘PersistentKeepalive’";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "‘%@’ anahtarı için bölüm başına yalnızca bir giriş olmalıdır";
 

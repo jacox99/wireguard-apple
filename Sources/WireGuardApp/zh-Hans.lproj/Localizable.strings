@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "公钥";
 "tunnelPeerPreSharedKey" = "预共享密钥";
 "tunnelPeerEndpoint" = "对端";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "连接保活间隔";
 "tunnelPeerAllowedIPs" = "路由的 IP 地址（段）";
 "tunnelPeerRxBytes" = "接收数据量";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "节点的允许访问IP必须是一个逗号分隔的 IP 地址列表, 可用 CIDR 表示";
 "alertInvalidPeerMessageEndpointInvalid" = "节点的端点的格式必须为 \"host:port\" 或 \"[host]:port\"";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "节点的连接保活间隔必须介于 0 至 65535 之间，或不指定";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "两个或多个节点不能拥有相同的公钥";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "允许的IP ”%@“ 无效";
 "macAlertEndpointInvalid (%@)" = "端点 ”%@“ 无效";
 "macAlertPersistentKeepliveInvalid (%@)" = "连接保活间隔的值 ”%@“ 无效";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "节点包含无法识别的键值 ”%@“";
-"macAlertInfoUnrecognizedPeerKey" = "有效的键为： ‘公钥’, ‘预分享密钥’, ‘允许的IP’, ‘端点’ 和 ‘连接保活间隔’";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "键 ”%@“ 的每个段落应该只能有一个条目";
 

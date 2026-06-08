@@ -32,6 +32,38 @@ $ open WireGuard.xcodeproj
 
 - Flip switches, press buttons, and make whirling noises until Xcode builds it.
 
+## wg-obfuscator configuration
+
+This client can obfuscate WireGuard traffic without running a standalone
+`wg-obfuscator` process on iOS or macOS. Configure obfuscation per peer in the
+WireGuard configuration. The peer `Endpoint` must be the server-side
+`wg-obfuscator` listen address, and the server-side `wg-obfuscator` should
+forward decoded traffic to the real WireGuard UDP port.
+
+Example:
+
+```ini
+[Interface]
+PrivateKey = <client-private-key>
+Address = 10.0.0.2/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = <server-public-key>
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = vpn.example.com:443
+PersistentKeepalive = 25
+ObfuscationKey = <same-key-configured-on-server-obfuscator>
+ObfuscationMasking = STUN
+ObfuscationMaxDummy = 4
+```
+
+`ObfuscationKey` is required to enable obfuscation for a peer. It must be a
+non-empty UTF-8 string up to 255 bytes. `ObfuscationMasking` is optional and
+accepts `NONE`, `AUTO`, or `STUN`; omit it for `NONE`. `ObfuscationMaxDummy`
+matches wg-obfuscator's `--max-dummy` option for data packets, accepts `0` to
+`1024`, and defaults to `4` when omitted.
+
 ## WireGuardKit integration
 
 1. Open your Xcode project and add the Swift package with the following URL:

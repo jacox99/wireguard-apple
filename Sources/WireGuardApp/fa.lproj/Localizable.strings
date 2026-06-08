@@ -77,6 +77,9 @@
 "tunnelPeerPublicKey" = "کلید عمومی";
 "tunnelPeerPreSharedKey" = "کلید از پیش تقسیم شده";
 "tunnelPeerEndpoint" = "نقطه پایان";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "زنده نگه‌داشتن پیوسته";
 "tunnelPeerAllowedIPs" = "IPهای مجاز";
 "tunnelPeerRxBytes" = "داده دریافت شد";
@@ -372,6 +375,9 @@
 "alertInvalidInterfaceMessagePrivateKeyInvalid" = "Interface’s private key must be a 32-byte key in base64 encoding";
 "alertInvalidInterfaceMessageDNSInvalid" = "Interface’s DNS servers must be a list of comma-separated IP addresses";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Peer’s persistent keepalive must be between 0 to 65535, or unspecified";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyRequired" = "Peer’s public key is required";
 "alertCantOpenOutputZipFileForWritingMessage" = "Could not open zip file for writing.";
 "alertInvalidPeerMessagePublicKeyInvalid" = "Peer’s public key must be a 32-byte key in base64 encoding";
@@ -390,7 +396,10 @@
 "macToolTipToggleStatus" = "Toggle status (⌘T)";
 "macTunnelsMenuTitle" = "Tunnels";
 "scanQRCodeTipText" = "Tip: Generate with `qrencode -t ansiutf8 < tunnel.conf`";
-"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ and ‘PersistentKeepalive’";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Peer’s allowed IPs must be a list of comma-separated IP addresses, optionally in CIDR notation";
 "alertTunnelAlreadyExistsWithThatNameMessage" = "A tunnel with that name already exists";
 "iosExportPrivateData" = "Authenticate to export tunnel private keys.";

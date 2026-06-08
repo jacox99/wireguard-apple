@@ -36,7 +36,7 @@ func TestInTunnelTCP(t *testing.T) {
 	aConfig := configs[0] + endpointConfigs[0]
 	bConfig := configs[1] + endpointConfigs[1]
 
-	tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil)
+	tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil, "")
 
 	bDev := device.NewDevice(b, conn.NewStdNetBind(), device.NewLogger(device.LogLevelSilent, ""))
 
@@ -106,8 +106,7 @@ func TestInTunnelTCPShutdown(t *testing.T) {
 	configs, endpointConfigs := genConfigs(t)
 	aConfig := configs[0] + endpointConfigs[0]
 
-
-	tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil)
+	tunnel := wgTurnOnIANFromExistingTunnel(a, aConfig, aIp, nil, "")
 
 	remoteAddr := "1.2.3.5:9090"
 	// Opening connections that go nowhere must not block the shutdown of a tunnel
@@ -166,7 +165,6 @@ func TestChunkIterator_MultipleChunks(t *testing.T) {
 		t.Errorf("Expected nil after exhausting chunks, got %v", chunk)
 	}
 }
-
 
 func TestChunkIterator_SliceValidity(t *testing.T) {
 	// Test that returned slices are valid views into the original data

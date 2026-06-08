@@ -75,6 +75,8 @@ const (
 	errTCPNoSocket = -21
 	errTCPWrite    = -22
 	errTCPRead     = -23
+	// Obfuscation errors
+	errBadObfuscationConfig = -24
 )
 
 var loggerFunc unsafe.Pointer
@@ -219,7 +221,7 @@ func wgTurnOnMultihopInner(tun tun.Device, exitSettings *C.char, entrySettings *
 	exitDev := device.NewDevice(&wrapper, singletun.Binder(), logger)
 
 	daitaParams := daitaParametersFromRaw(maybeNotMachines, daitaParameters)
-	return addTunnelFromDevice(exitDev, entryDev, exitConfigString, entryConfigString, virtualNet, logger, daitaParams)
+	return addTunnelFromDevice(exitDev, entryDev, exitConfigString, entryConfigString, virtualNet, logger, daitaParams, nil)
 }
 
 //export wgTurnOnMultihop
@@ -259,10 +261,10 @@ func wgTurnOn(settings *C.char, tunFd int32, maybeNotMachines *C.char, daitaPara
 	dev := device.NewDevice(tun, conn.NewStdNetBind(), logger)
 
 	daitaParams := daitaParametersFromRaw(maybeNotMachines, daitaParameters)
-	return addTunnelFromDevice(dev, nil, C.GoString(settings), "", nil, logger, daitaParams)
+	return addTunnelFromDevice(dev, nil, C.GoString(settings), "", nil, logger, daitaParams, nil)
 }
 
-func wgTurnOnIANFromExistingTunnel(tun tun.Device, settings string, privateAddr netip.Addr, daitaParameters *daitaParameters) int32 {
+func wgTurnOnIANFromExistingTunnel(tun tun.Device, settings string, privateAddr netip.Addr, daitaParameters *daitaParameters, obfuscationSettings string) int32 {
 	logger := &device.Logger{
 		Verbosef: CLogger(0).Printf,
 		Errorf:   CLogger(1).Printf,
@@ -284,13 +286,19 @@ func wgTurnOnIANFromExistingTunnel(tun tun.Device, settings string, privateAddr 
 
 	wrapper := NewRouter(tun, vtun)
 	logger.Verbosef("Attaching to interface")
-	dev := device.NewDevice(&wrapper, conn.NewStdNetBind(), logger)
+	bind := newObfuscatingBind(conn.NewStdNetBind())
+	if err := bind.Configure(obfuscationSettings); err != nil {
+		logger.Errorf("Invalid obfuscation configuration: %v", err)
+		tun.Close()
+		return errBadObfuscationConfig
+	}
+	dev := device.NewDevice(&wrapper, bind, logger)
 
-	return addTunnelFromDevice(dev, nil, settings, "", virtualNet, logger, daitaParameters)
+	return addTunnelFromDevice(dev, nil, settings, "", virtualNet, logger, daitaParameters, bind)
 }
 
 //export wgTurnOnIAN
-func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachines *C.char, daitaParameters *C.DaitaGoParameters) int32 {
+func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachines *C.char, daitaParameters *C.DaitaGoParameters, obfuscationSettings *C.char) int32 {
 	logger := &device.Logger{
 		Verbosef: CLogger(0).Printf,
 		Errorf:   CLogger(1).Printf,
@@ -309,7 +317,7 @@ func wgTurnOnIAN(settings *C.char, tunFd int32, privateIP *C.char, maybeNotMachi
 	}
 
 	daitaParams := daitaParametersFromRaw(maybeNotMachines, daitaParameters)
-	return wgTurnOnIANFromExistingTunnel(tun, C.GoString(settings), privateAddr, daitaParams)
+	return wgTurnOnIANFromExistingTunnel(tun, C.GoString(settings), privateAddr, daitaParams, C.GoString(obfuscationSettings))
 }
 
 //export wgTurnOff
@@ -328,6 +336,15 @@ func wgSetConfig(tunnelHandle int32, settings *C.char) int64 {
 		return errNoSuchTunnel
 	}
 	return handle.SetConfig(C.GoString(settings))
+}
+
+//export wgSetObfuscationConfig
+func wgSetObfuscationConfig(tunnelHandle int32, settings *C.char) {
+	handle := tunnels.Get(tunnelHandle)
+	if handle == nil {
+		return
+	}
+	handle.SetObfuscationConfig(C.GoString(settings))
 }
 
 //export wgGetConfig

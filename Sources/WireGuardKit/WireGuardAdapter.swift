@@ -235,7 +235,14 @@ public class WireGuardAdapter {
                 self.logEndpointResolutionResults(resolutionResults)
 
                 self.state = .started(
-                    try self.startWireGuardBackend(exitWgConfig: exitWgConfig, privateAddress: privateAddress, entryWgConfig: entryWgConfig, mtu: 1280, daita: daita),
+                    try self.startWireGuardBackend(
+                        exitWgConfig: exitWgConfig,
+                        privateAddress: privateAddress,
+                        entryWgConfig: entryWgConfig,
+                        mtu: 1280,
+                        daita: daita,
+                        obfuscationConfig: settingsGenerator.obfuscationConfiguration()
+                    ),
                     settingsGenerator
                 )
 
@@ -328,6 +335,7 @@ public class WireGuardAdapter {
                 let (entryConfig, _) = settingsGenerator.entryUapiConfiguration() ?? (nil, [])
                 self.logEndpointResolutionResults(resolutionResults)
 
+                wgSetObfuscationConfig(handle, settingsGenerator.obfuscationConfiguration())
                 wgSetConfig(handle, wgConfig, entryConfig)
                 #if os(iOS)
                 wgDisableSomeRoamingForBrokenMobileSemantics(handle)
@@ -407,7 +415,7 @@ public class WireGuardAdapter {
     /// - Parameter wgConfig: WireGuard configuration
     /// - Throws: an error of type `WireGuardAdapterError`
     /// - Returns: tunnel handle
-    private func startWireGuardBackend(exitWgConfig: String, privateAddress: IPAddress, entryWgConfig: String? = nil, mtu: UInt16 = 1280, daita: DaitaConfiguration?) throws -> Int32 {
+    private func startWireGuardBackend(exitWgConfig: String, privateAddress: IPAddress, entryWgConfig: String? = nil, mtu: UInt16 = 1280, daita: DaitaConfiguration?, obfuscationConfig: String) throws -> Int32 {
         guard let tunnelFileDescriptor = self.tunnelFileDescriptor else {
             throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
         }
@@ -418,7 +426,7 @@ public class WireGuardAdapter {
         let handle = if let entryWgConfig {
             wgTurnOnMultihop(exitWgConfig, entryWgConfig, privateAddr, tunnelFileDescriptor, daita?.machines ?? nil, &params)
         } else {
-            wgTurnOnIAN(exitWgConfig, tunnelFileDescriptor, privateAddr, daita?.machines ?? nil, &params)
+            wgTurnOnIAN(exitWgConfig, tunnelFileDescriptor, privateAddr, daita?.machines ?? nil, &params, obfuscationConfig)
         }
         if handle < 0 {
             throw WireGuardAdapterError.startWireGuardBackend(handle)
@@ -515,6 +523,7 @@ public class WireGuardAdapter {
                 let (wgConfig, resolutionResults) = settingsGenerator.endpointUapiConfiguration()
                 self.logEndpointResolutionResults(resolutionResults)
 
+                wgSetObfuscationConfig(handle, settingsGenerator.obfuscationConfiguration())
                 wgSetConfig(handle, wgConfig, nil)
                 wgDisableSomeRoamingForBrokenMobileSemantics(handle)
                 wgBumpSockets(handle)
@@ -543,7 +552,12 @@ public class WireGuardAdapter {
                 self.logEndpointResolutionResults(resolutionResults)
 
                 self.state = .started(
-                    try self.startWireGuardBackend(exitWgConfig: exitWgConfig, privateAddress: privateAddress, daita: settingsGenerator.daita),
+                    try self.startWireGuardBackend(
+                        exitWgConfig: exitWgConfig,
+                        privateAddress: privateAddress,
+                        daita: settingsGenerator.daita,
+                        obfuscationConfig: settingsGenerator.obfuscationConfiguration()
+                    ),
                     settingsGenerator
                 )
 

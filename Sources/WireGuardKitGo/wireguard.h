@@ -20,11 +20,12 @@ typedef struct {
 extern void test_daita(DaitaGoParameters *context);
 typedef void(*logger_fn_t)(void *context, int level, const char *msg);
 extern void wgSetLogger(void *context, logger_fn_t logger_fn);
-extern int wgTurnOnIAN(const char *settings, int32_t tun_fd, const char *private_ip, const char *maybeNotMachines, DaitaGoParameters *daitaParameters);
+extern int wgTurnOnIAN(const char *settings, int32_t tun_fd, const char *private_ip, const char *maybeNotMachines, DaitaGoParameters *daitaParameters, const char *obfuscationSettings);
 extern int wgTurnOn(const char *settings, int32_t tun_fd, const char *maybeNotMachines, DaitaGoParameters *daitaParameters);
 extern int wgTurnOnMultihop(const char *exitSettings, const char *entrySettings, const char *privateIp, int32_t tun_fd, const char *maybenotMachines, DaitaGoParameters *daitaParameters);
 extern void wgTurnOff(int handle);
 extern int64_t wgSetConfig(int handle, const char *exitSettings, const char *entrySettings);
+extern void wgSetObfuscationConfig(int handle, const char *settings);
 extern char *wgGetConfig(int handle);
 extern void wgBumpSockets(int handle);
 extern void wgDisableSomeRoamingForBrokenMobileSemantics(int handle);

@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "ਪਬਲਿਕ ਕੁੰਜੀ";
 "tunnelPeerPreSharedKey" = "ਤਰਜੀਹੀ ਕੁੰਜੀ";
 "tunnelPeerEndpoint" = "ਐਂਡ-ਪੁਆਇੰਟ";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "ਸਥਿਰ ਲਗਾਤਾਰ ਜਾਰੀ ਰੱਖੋ";
 "tunnelPeerAllowedIPs" = "ਮਨਜ਼ੂਰ ਕੀਤੇ IP";
 "tunnelPeerRxBytes" = "ਮਿਲਿਆ ਡਾਟਾ";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "ਪੀਅਰ ਦੇ ਮਨਜ਼ੂਰ ਕੀਤੇ IP ਕਾਮਿਆਂ ਰਾਹੀਂ ਵੱਖ ਕੀਤੇ ਹੋਏ IP ਐਡਰੈਸ, ਚੋਣਵੇਂ ਵਿੱਚ CIDR ਰੂਪ ਵਿੱਚ ਸੂਚੀ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ";
 "alertInvalidPeerMessageEndpointInvalid" = "ਪੀਅਰ ਦਾ ਐਂਡ-ਪੁਆਇੰਟ ‘host:port’ ਜਾਂ ‘[host]:port’ ਰੂਪ ਵਿੱਚ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "ਪੀਅਰ ਦਾ ਅਟੱਲ keepalive 0 ਤੋਂ 65535 ਵਿਚਾਲੇ ਜਾਂ ਨਾ ਦਿੱਤਾ ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "ਦੋ ਜਾਂ ਵੱਧ ਪੀਅਰਾਂ ਦੀ ਇੱਕ ਪਬਲਿਕ ਕੁੰਜੀ ਨਹੀਂ ਹੋ ਸਕਦੀ ਹੈ";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "ਮਨਜ਼ੂਰ ਕੀਤਾ IP ‘%@’ ਗ਼ੈਰ-ਵਾਜਬ ਹੈ";
 "macAlertEndpointInvalid (%@)" = "ਐਂਡ-ਪੁਆਇੰਟ ‘%@’ ਗ਼ੈਰ-ਵਾਜਬ ਹੈ";
 "macAlertPersistentKeepliveInvalid (%@)" = "Persistent keepalive ਮੁੱਲ ‘%@’ ਗ਼ੈਰ-ਵਾਜਬ ਹੈ";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "ਪੀਅਰ ਵਿੱਚ ਬੇਪਛਾਣ ਸ਼ਬਦ ‘%@’";
-"macAlertInfoUnrecognizedPeerKey" = "ਵਾਜਬ ਸ਼ਬਦ ਹਨ: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ ਅਤੇ ‘PersistentKeepalive’";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "ਸ਼ਬਦ ‘%@’ ਲਈ ਹਰ ਭਾਗ ਵਿੱਚ ਇੱਕ ਹੀ ਐਂਟਰੀ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ";
 

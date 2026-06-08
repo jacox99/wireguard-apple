@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Public key";
 "tunnelPeerPreSharedKey" = "Preshared key";
 "tunnelPeerEndpoint" = "Endpoint";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Persistent keepalive";
 "tunnelPeerAllowedIPs" = "IP yang diperbolehkan";
 "tunnelPeerRxBytes" = "Data diterima";
@@ -177,6 +180,9 @@
 "macDeleteTunnelConfirmationAlertButtonTitleCancel" = "Cancel";
 "alertSystemErrorMessageTunnelConfigurationDisabled" = "The configuration is disabled.";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Peer’s persistent keepalive must be between 0 to 65535, or unspecified";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertUnableToWriteLogTitle" = "Log export failed";
 "alertInvalidPeerMessagePublicKeyRequired" = "Peer’s public key is required";
 "macMenuNetworksNone" = "Networks: None";
@@ -242,7 +248,10 @@
 "macMenuImportTunnels" = "Import Tunnel(s) from File…";
 "alertScanQRCodeInvalidQRCodeTitle" = "Invalid QR Code";
 "macMenuViewLog" = "View Log";
-"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ and ‘PersistentKeepalive’";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 "tunnelOnDemandNoSSIDs" = "No SSIDs";
 "deleteTunnelConfirmationAlertButtonTitle" = "Delete";
 "tunnelEditPlaceholderTextOff" = "Off";

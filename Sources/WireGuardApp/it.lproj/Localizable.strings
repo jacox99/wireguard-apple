@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Chiave pubblica";
 "tunnelPeerPreSharedKey" = "Chiave pre-condivisa";
 "tunnelPeerEndpoint" = "Endpoint";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Keepalive permanente";
 "tunnelPeerAllowedIPs" = "IP consentiti";
 "tunnelPeerRxBytes" = "Dati ricevuti";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Gli IP consentiti dal peer devono essere un elenco di indirizzi IP separati da virgole, facoltativamente nella notazione CIDR";
 "alertInvalidPeerMessageEndpointInvalid" = "L'endpoint del peer deve essere nella forma 'host:porta' o '[host]:porta'";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Il keepalive permanente del peer deve essere compreso tra 0 e 65535, o non specificato";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Due o più peer non possono avere la stessa chiave pubblica";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "L'IP consentito ‘%@’ non è valido";
 "macAlertEndpointInvalid (%@)" = "L'endpoint ‘%@’ non è valido";
 "macAlertPersistentKeepliveInvalid (%@)" = "Il valore di keepalive permanente ‘%@’ non è valido";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Peer contiene una chiave non riconosciuta ‘%@’";
-"macAlertInfoUnrecognizedPeerKey" = "Chiavi valide sono: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ e ‘PersistentKeepalive’";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "Dovrebbe esistere solo una voce per sezione della chiave ‘%@’";
 

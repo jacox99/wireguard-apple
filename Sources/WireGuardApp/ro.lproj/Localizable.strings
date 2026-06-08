@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Cheie publică";
 "tunnelPeerPreSharedKey" = "Cheie predistribuită";
 "tunnelPeerEndpoint" = "Punct final";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Mesaj keepalive persistent";
 "tunnelPeerAllowedIPs" = "IP-uri permise";
 "tunnelPeerRxBytes" = "Date primite";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "IP-urile permise ale perechii trebuie să reprezinte o listă cu adrese IP separate prin virgulă, opțional în notația CIDR";
 "alertInvalidPeerMessageEndpointInvalid" = "Punctul final al perechii trebuie să fie sub forma „gazdă:port” sau „[host]:port”";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Mesajul keepalive persistent al perechii trebuie să fie între 0 și 65535 sau să fie nespecificat";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Două sau mai multe perechi nu pot avea aceeași cheie publică";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "IP-ul permis „%@” este invalid";
 "macAlertEndpointInvalid (%@)" = "Punctul final „%@” este invalid";
 "macAlertPersistentKeepliveInvalid (%@)" = "Valoarea mesajului keepalive persistent „%@” este invalid";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Perechea conține cheia nerecunoscută „%@”";
-"macAlertInfoUnrecognizedPeerKey" = "Cheile valide sunt: „PublicKey”, „PresharedKey”, „AllowedIPs”, „Endpoint” și „PersistentKeepalive”";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "Trebuie să existe o singură înregistrare pe secțiune pentru cheia „%@”";
 

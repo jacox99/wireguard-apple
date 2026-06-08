@@ -99,6 +99,9 @@
 "macMenuDeleteSelected" = "Delete Selected";
 "alertSystemErrorMessageTunnelConfigurationInvalid" = "The configuration is invalid.";
 "tunnelPeerEndpoint" = "Endpoint";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelInterfaceMTU" = "MTU";
 "alertInvalidInterfaceMessageListenPortInvalid" = "Interface’s listen port must be between 0 and 65535, or unspecified";
 "addPeerButtonTitle" = "Add peer";
@@ -185,6 +188,9 @@
 "macDeleteTunnelConfirmationAlertButtonTitleCancel" = "Cancel";
 "alertSystemErrorMessageTunnelConfigurationDisabled" = "The configuration is disabled.";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Peer’s persistent keepalive must be between 0 to 65535, or unspecified";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "macMenuNetworksNone" = "Networks: None";
 "tunnelOnDemandSSIDsKey" = "SSIDs";
 "alertCantOpenOutputZipFileForWritingMessage" = "Could not open zip file for writing.";
@@ -242,7 +248,10 @@
 "alertNoTunnelsToExportMessage" = "There are no tunnels to export";
 "macMenuImportTunnels" = "Import Tunnel(s) from File…";
 "macMenuViewLog" = "View Log";
-"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ and ‘PersistentKeepalive’";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 "tunnelOnDemandNoSSIDs" = "No SSIDs";
 "deleteTunnelConfirmationAlertButtonTitle" = "Delete";
 "tunnelEditPlaceholderTextOff" = "Off";

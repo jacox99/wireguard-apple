@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Clave pública";
 "tunnelPeerPreSharedKey" = "Clave precompartida";
 "tunnelPeerEndpoint" = "Punto final";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Keepalive persistente";
 "tunnelPeerAllowedIPs" = "IPs permitidas";
 "tunnelPeerRxBytes" = "Datos recibidos";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Las IPs permitidas del par deben ser una lista de direcciones IP separadas por comas, opcionalmente en notación CIDR";
 "alertInvalidPeerMessageEndpointInvalid" = "El punto final del par debe ser de la forma ‘host:port’ o ‘[host]:port’";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "El keepalive persistente del peer debe estar entre 0 y 65535, o no especificado";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Dos o mas pares no pueden tener la misma llave pùblica";
 
 // Scanning QR code UI
@@ -328,7 +334,10 @@
 "macAlertPreSharedKeyInvalid" = "La clave compartida no es válida";
 "macAlertEndpointInvalid (%@)" = "Endpoint ‘%@’ no es válido";
 "macAlertPersistentKeepliveInvalid (%@)" = "El valor keepalive persistente '%@' no es válido";
-"macAlertInfoUnrecognizedPeerKey" = "Las claves válidas son: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’ y ‘PersistentKeepalive’";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 "macConfirmAndQuitAlertQuitWireGuard" = "Salir de WireGuard";
 "macConfirmAndQuitAlertCloseWindow" = "Cerrar Gestor de túneles";
 

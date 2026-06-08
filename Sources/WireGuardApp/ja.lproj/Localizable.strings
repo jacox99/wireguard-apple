@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "公開鍵";
 "tunnelPeerPreSharedKey" = "事前共有鍵";
 "tunnelPeerEndpoint" = "エンドポイント";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "持続的キープアライブ";
 "tunnelPeerAllowedIPs" = "Allowed IPs";
 "tunnelPeerRxBytes" = "受信したデータ";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "ピアのAllowed IPはカンマで区切られたIPアドレス（CIDR表記可）のリストでなければなりません";
 "alertInvalidPeerMessageEndpointInvalid" = "ピアのエンドポイントは 'ホスト:ポート番号' または '[ホスト]:ポート番号' の形式でなければなりません’";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "ピアの持続的キープアライブは0から65535の範囲内の値か、または未指定でなければなりません";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "複数のピアで同じ公開鍵は使用できません";
 
 // Scanning QR code UI
@@ -385,9 +391,12 @@
 "macAlertAllowedIPInvalid (%@)" = "Allowed IP ‘%@’ は無効です";
 "macAlertEndpointInvalid (%@)" = "Endpoint ‘%@’ は無効です";
 "macAlertPersistentKeepliveInvalid (%@)" = "持続的キープアライブの値 ‘%@’ は無効です";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Peerに認識不能なキー項目 ‘%@’ が含まれています";
-"macAlertInfoUnrecognizedPeerKey" = "有効なキー項目: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 "macAlertMultipleEntriesForKey (%@)" = "キー項目 ‘%@’ は各セクションに1エントリだけにします";
 

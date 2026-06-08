@@ -80,6 +80,9 @@
 "tunnelPeerPublicKey" = "Julkinen avain";
 "tunnelPeerPreSharedKey" = "Jaettu avain";
 "tunnelPeerEndpoint" = "Päätepiste";
+"tunnelPeerObfuscationKey" = "Obfuscation key";
+"tunnelPeerObfuscationMasking" = "Obfuscation masking";
+"tunnelPeerObfuscationMaxDummy" = "Obfuscation max dummy";
 "tunnelPeerPersistentKeepalive" = "Jatkuva keepalive";
 "tunnelPeerAllowedIPs" = "Sallitut IP-osoitteet";
 "tunnelPeerRxBytes" = "Data vastaanotettu";
@@ -178,6 +181,9 @@
 "alertInvalidPeerMessageAllowedIPsInvalid" = "Toisen osapuolen sallittujen IP-osoitteiden on oltava pilkulla erotettujen IP-osoitteiden luettelo, valinnaisesti CIDR-notaatiossa";
 "alertInvalidPeerMessageEndpointInvalid" = "Käyttäjän päätepisteen on oltava muotoa ”host:port” tai ”[host]:port”";
 "alertInvalidPeerMessagePersistentKeepaliveInvalid" = "Käyttäjän pysyvän keepalivin on oltava välillä 0–65535 tai määrittelemätön";
+"alertInvalidPeerMessageObfuscationKeyInvalid" = "Peer’s obfuscation key must be between 1 and 255 UTF-8 bytes";
+"alertInvalidPeerMessageObfuscationMaskingInvalid" = "Peer’s obfuscation masking must be ‘none’, ‘auto’, or ‘stun’";
+"alertInvalidPeerMessageObfuscationMaxDummyInvalid" = "Peer’s obfuscation max dummy must be between 0 and 1024, or unspecified";
 "alertInvalidPeerMessagePublicKeyDuplicated" = "Kahdella tai useammalla osapuolella ei voi olla samaa julkista avainta";
 
 // Scanning QR code UI
@@ -325,9 +331,12 @@
 "macAlertAllowedIPInvalid (%@)" = "Sallitut IP-osoitteet %@\" eivät kelpaa";
 "macAlertEndpointInvalid (%@)" = "Päätepiste \"%@\" ei kelpaa";
 "macAlertPersistentKeepliveInvalid (%@)" = "Pysyvä keepalive arvo ‘%@’ ei kelpaa";
+"macAlertObfuscationKeyInvalid (%@)" = "Obfuscation key ‘%@’ is invalid";
+"macAlertObfuscationMaskingInvalid (%@)" = "Obfuscation masking ‘%@’ is invalid";
+"macAlertObfuscationMaxDummyInvalid (%@)" = "Obfuscation max dummy ‘%@’ is invalid";
 
 "macAlertUnrecognizedPeerKey (%@)" = "Osapuoli sisältää tunnistamattoman avaimen ”%@”";
-"macAlertInfoUnrecognizedPeerKey" = "Voimassa olevat avaimet ovat: ”PublicKey”, ”PresharedKey”, ”AllowedIPs”, ”Endpoint” ja ”PersistentKeepalive”";
+"macAlertInfoUnrecognizedPeerKey" = "Valid keys are: ‘PublicKey’, ‘PresharedKey’, ‘AllowedIPs’, ‘Endpoint’, ‘PersistentKeepalive’, ‘ObfuscationKey’, ‘ObfuscationMasking’ and ‘ObfuscationMaxDummy’";
 
 // Mac about dialog
 

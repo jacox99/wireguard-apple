@@ -40,6 +40,7 @@ class TunnelDetailTableViewController: NSViewController {
 
     static let peerFields: [TunnelViewModel.PeerField] = [
         .publicKey, .preSharedKey, .endpoint,
+        .obfuscationKey, .obfuscationMasking, .obfuscationMaxDummy,
         .allowedIPs, .persistentKeepAlive,
         .rxBytes, .txBytes, .lastHandshakeTime
     ]

@@ -41,6 +41,9 @@ class TunnelViewModel {
         case publicKey
         case preSharedKey
         case endpoint
+        case obfuscationKey
+        case obfuscationMasking
+        case obfuscationMaxDummy
         case persistentKeepAlive
         case allowedIPs
         case rxBytes
@@ -54,6 +57,9 @@ class TunnelViewModel {
             case .publicKey: return tr("tunnelPeerPublicKey")
             case .preSharedKey: return tr("tunnelPeerPreSharedKey")
             case .endpoint: return tr("tunnelPeerEndpoint")
+            case .obfuscationKey: return tr("tunnelPeerObfuscationKey")
+            case .obfuscationMasking: return tr("tunnelPeerObfuscationMasking")
+            case .obfuscationMaxDummy: return tr("tunnelPeerObfuscationMaxDummy")
             case .persistentKeepAlive: return tr("tunnelPeerPersistentKeepalive")
             case .allowedIPs: return tr("tunnelPeerAllowedIPs")
             case .rxBytes: return tr("tunnelPeerRxBytes")
@@ -314,6 +320,15 @@ class TunnelViewModel {
             if let endpoint = config.endpoint {
                 scratchpad[.endpoint] = endpoint.stringRepresentation
             }
+            if let obfuscationKey = config.obfuscationKey {
+                scratchpad[.obfuscationKey] = obfuscationKey
+            }
+            if config.obfuscationMasking != .none {
+                scratchpad[.obfuscationMasking] = config.obfuscationMasking.rawValue.uppercased()
+            }
+            if let obfuscationMaxDummy = config.obfuscationMaxDummy {
+                scratchpad[.obfuscationMaxDummy] = String(obfuscationMaxDummy)
+            }
             if let persistentKeepAlive = config.persistentKeepAlive {
                 scratchpad[.persistentKeepAlive] = String(persistentKeepAlive)
             }
@@ -378,6 +393,30 @@ class TunnelViewModel {
                 } else {
                     fieldsWithError.insert(.persistentKeepAlive)
                     errorMessages.append(tr("alertInvalidPeerMessagePersistentKeepaliveInvalid"))
+                }
+            }
+            if let obfuscationKey = scratchpad[.obfuscationKey] {
+                if !obfuscationKey.isEmpty && obfuscationKey.utf8.count <= 255 {
+                    config.obfuscationKey = obfuscationKey
+                } else {
+                    fieldsWithError.insert(.obfuscationKey)
+                    errorMessages.append(tr("alertInvalidPeerMessageObfuscationKeyInvalid"))
+                }
+            }
+            if let obfuscationMaskingString = scratchpad[.obfuscationMasking] {
+                if let obfuscationMasking = ObfuscationMasking(rawValue: obfuscationMaskingString.lowercased()) {
+                    config.obfuscationMasking = obfuscationMasking
+                } else {
+                    fieldsWithError.insert(.obfuscationMasking)
+                    errorMessages.append(tr("alertInvalidPeerMessageObfuscationMaskingInvalid"))
+                }
+            }
+            if let obfuscationMaxDummyString = scratchpad[.obfuscationMaxDummy] {
+                if let obfuscationMaxDummy = UInt16(obfuscationMaxDummyString), obfuscationMaxDummy <= 1024 {
+                    config.obfuscationMaxDummy = obfuscationMaxDummy
+                } else {
+                    fieldsWithError.insert(.obfuscationMaxDummy)
+                    errorMessages.append(tr("alertInvalidPeerMessageObfuscationMaxDummyInvalid"))
                 }
             }
 
